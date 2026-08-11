@@ -16,6 +16,7 @@ namespace PocketBridge.Infrastructure.Embedded;
 internal sealed class ScrcpyTransport : IAsyncDisposable
 {
     private readonly AndroidDevice _device;
+    private readonly ScrcpyLaunchOptions _options;
     private readonly IAdbService _adb;
     private readonly IExecutableLocator _locator;
     private readonly IAppSettingsService _settings;
@@ -27,9 +28,10 @@ internal sealed class ScrcpyTransport : IAsyncDisposable
     private int _disposed;
     private readonly ConcurrentQueue<string> _serverLog = new();
 
-    public ScrcpyTransport(AndroidDevice device, IAdbService adb, IExecutableLocator locator, IAppSettingsService settings)
+    public ScrcpyTransport(AndroidDevice device, ScrcpyLaunchOptions options, IAdbService adb, IExecutableLocator locator, IAppSettingsService settings)
     {
         _device = device;
+        _options = options;
         _adb = adb;
         _locator = locator;
         _settings = settings;
@@ -86,13 +88,22 @@ internal sealed class ScrcpyTransport : IAsyncDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in new[]
+        var serverArguments = new List<string>
         {
             "-s", _device.Serial, "shell", "CLASSPATH=/data/local/tmp/scrcpy-server.jar", "app_process", "/",
             "com.genymobile.scrcpy.Server", ScrcpyProtocolV41.Version, $"scid={scid:x8}", "tunnel_forward=true",
-            "audio=false", "control=true", "video=true", "video_codec=h264", "max_size=1280", "max_fps=60",
-            "send_device_meta=true", "send_stream_meta=true", "send_frame_meta=true", "stay_awake=true", "power_off_on_close=false"
-        }) info.ArgumentList.Add(argument);
+            "audio=false", "control=true", "video=true", "video_codec=h264",
+            "send_device_meta=true", "send_stream_meta=true", "send_frame_meta=true",
+            $"stay_awake={_options.StayAwake.ToString().ToLowerInvariant()}", "power_off_on_close=false"
+        };
+        if (_options.MaxSize is > 0) serverArguments.Add($"max_size={_options.MaxSize}");
+        if (_options.MaxFps is > 0) serverArguments.Add($"max_fps={_options.MaxFps}");
+        if (!string.IsNullOrWhiteSpace(_options.VideoBitRate))
+        {
+            var normalized = _options.VideoBitRate.Trim().ToUpperInvariant();
+            if (normalized.EndsWith('M') && int.TryParse(normalized[..^1], out var mbps)) serverArguments.Add($"video_bit_rate={mbps * 1_000_000}");
+        }
+        foreach (var argument in serverArguments) info.ArgumentList.Add(argument);
         var process = new Process { StartInfo = info, EnableRaisingEvents = true };
         if (!process.Start()) throw new InvalidOperationException("Could not start scrcpy-server through ADB.");
         _ = DrainAsync(process.StandardOutput, _serverLog);

@@ -15,7 +15,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IExecutableLocator _locator;
     private readonly IAppSettingsService _settings;
     private readonly IRuntimeToolsService _runtimeTools;
+    private readonly IDeviceProfileService _profiles;
     private readonly ISettingsDialogService _settingsDialog;
+    private readonly IDeviceProfileDialogService _profileDialog;
     private readonly IConfirmationService _confirmation;
     private readonly IFeatureDialogService _featureDialogs;
     private readonly CancellationTokenSource _lifetime = new();
@@ -23,6 +25,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly SynchronizationContext? _uiContext;
     private DeviceItemViewModel? _selectedDevice;
     private bool _isBusy;
+    private bool _isMultiView;
     private bool _adbAvailable;
     private string _statusMessage = LocalizationService.Current["StatusRefreshing"];
     private StatusKind _statusKind = StatusKind.Neutral;
@@ -34,7 +37,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IExecutableLocator locator,
         IAppSettingsService settings,
         IRuntimeToolsService runtimeTools,
+        IDeviceProfileService profiles,
         ISettingsDialogService settingsDialog,
+        IDeviceProfileDialogService profileDialog,
         IConfirmationService confirmation,
         IFeatureDialogService featureDialogs)
     {
@@ -44,7 +49,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _locator = locator;
         _settings = settings;
         _runtimeTools = runtimeTools;
+        _profiles = profiles;
         _settingsDialog = settingsDialog;
+        _profileDialog = profileDialog;
         _confirmation = confirmation;
         _featureDialogs = featureDialogs;
         _uiContext = SynchronizationContext.Current;
@@ -54,6 +61,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         RefreshCommand = new AsyncRelayCommand(() => RefreshDevicesAsync(true), () => !IsBusy);
         PrepareToolsCommand = new AsyncRelayCommand(PrepareToolsAsync, () => !IsBusy);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
+        ConfigureProfileCommand = new AsyncRelayCommand(ConfigureProfileAsync, CanControl);
+        ShowSingleViewCommand = new RelayCommand(ShowSingleView);
+        StartMultiViewCommand = new AsyncRelayCommand(StartMultiViewAsync, CanStartMultiView);
         ConnectCommand = new AsyncRelayCommand(ConnectAsync, CanConnect);
         OpenExternalCommand = new AsyncRelayCommand(OpenExternalAsync, CanOpenExternal);
         StopCommand = new AsyncRelayCommand(StopAsync, CanStop);
@@ -75,6 +85,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand PrepareToolsCommand { get; }
     public AsyncRelayCommand OpenSettingsCommand { get; }
+    public AsyncRelayCommand ConfigureProfileCommand { get; }
+    public RelayCommand ShowSingleViewCommand { get; }
+    public AsyncRelayCommand StartMultiViewCommand { get; }
     public AsyncRelayCommand ConnectCommand { get; }
     public AsyncRelayCommand OpenExternalCommand { get; }
     public AsyncRelayCommand StopCommand { get; }
@@ -100,6 +113,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(HasSelection));
             OnPropertyChanged(nameof(ShowSelectionPrompt));
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
+            OnPropertyChanged(nameof(ShowSingleDeviceContent));
             UpdateSelectionMessage();
             NotifyCommands();
         }
@@ -109,10 +123,26 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string DeviceCountText => LocalizationService.Current.Format("DeviceCountFormat", DeviceCount);
     public bool HasSelection => SelectedDevice is not null;
     public IEmbeddedDisplaySession? SelectedEmbeddedSession => SelectedDevice is null ? null : _embeddedSessions.Get(SelectedDevice.Serial);
+    public IReadOnlyList<IEmbeddedDisplaySession> ActiveEmbeddedSessions => _embeddedSessions.Sessions.Where(session => session.IsRunning).Take(4).ToArray();
+    public bool IsMultiView
+    {
+        get => _isMultiView;
+        private set
+        {
+            if (!SetProperty(ref _isMultiView, value)) return;
+            OnPropertyChanged(nameof(IsSingleView));
+            OnPropertyChanged(nameof(ShowSingleDeviceContent));
+            OnPropertyChanged(nameof(ShowSelectionPrompt));
+        }
+    }
+    public bool IsSingleView => !IsMultiView;
+    public bool ShowSingleDeviceContent => IsSingleView && HasSelection;
+    public int MultiViewColumns => ActiveEmbeddedSessions.Count <= 1 ? 1 : 2;
+    public int MultiViewRows => ActiveEmbeddedSessions.Count <= 2 ? 1 : 2;
     public bool ToolsAvailable => FindTool("adb.exe") is not null && FindTool("scrcpy.exe") is not null;
     public bool ShowToolsMissingState => !ToolsAvailable && !IsBusy;
     public bool ShowEmptyState => ToolsAvailable && Devices.Count == 0 && !IsBusy;
-    public bool ShowSelectionPrompt => ToolsAvailable && Devices.Count > 0 && !HasSelection;
+    public bool ShowSelectionPrompt => IsSingleView && ToolsAvailable && Devices.Count > 0 && !HasSelection;
     public bool IsBusy { get => _isBusy; private set { if (SetProperty(ref _isBusy, value)) { OnPropertyChanged(nameof(ShowEmptyState)); OnPropertyChanged(nameof(ShowToolsMissingState)); NotifyCommands(); } } }
     public string AdbStatusText => LocalizationService.Current[_adbAvailable ? "AdbReady" : "AdbUnavailable"];
     public Brush AdbStatusBrush => Brush(_adbAvailable ? 88 : 242, _adbAvailable ? 214 : 120, _adbAvailable ? 168 : 120);
@@ -175,11 +205,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 var existing = Devices.FirstOrDefault(item => item.Serial == device.Serial);
                 if (existing is null)
                 {
-                    Devices.Add(new DeviceItemViewModel(device, IsAnySessionRunning(device.Serial)));
+                    Devices.Add(new DeviceItemViewModel(device, _profiles.Get(device.Serial), IsAnySessionRunning(device.Serial)));
                 }
                 else
                 {
-                    existing.Update(device, IsAnySessionRunning(device.Serial));
+                    existing.Update(device, _profiles.Get(device.Serial), IsAnySessionRunning(device.Serial));
                 }
             }
 
@@ -212,7 +242,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         try
         {
             SetStatus(LocalizationService.Current.Format("StatusStarting", selected.FriendlyName), StatusKind.Neutral);
-            await _embeddedSessions.StartAsync(selected.Device, _lifetime.Token);
+            var profile = _profiles.Get(selected.Serial);
+            await _embeddedSessions.StartAsync(selected.Device, profile.ToLaunchOptions(), _lifetime.Token);
+            await _profiles.SaveAsync(profile with { LastConnected = DateTimeOffset.Now });
             selected.IsSessionRunning = true;
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
             SetStatus(LocalizationService.Current.Format("StatusSessionStarted", selected.FriendlyName), StatusKind.Success);
@@ -241,7 +273,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         try
         {
             await _embeddedSessions.StopAsync(selected.Serial);
-            await _embeddedSessions.StartAsync(selected.Device, _lifetime.Token);
+            var profile = _profiles.Get(selected.Serial);
+            await _embeddedSessions.StartAsync(selected.Device, profile.ToLaunchOptions(), _lifetime.Token);
+            await _profiles.SaveAsync(profile with { LastConnected = DateTimeOffset.Now });
             selected.IsSessionRunning = true;
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
             SetStatus(LocalizationService.Current.Format("StatusSessionRestarted", selected.FriendlyName), StatusKind.Success);
@@ -255,11 +289,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var selected = SelectedDevice!;
         try
         {
-            await _scrcpy.StartAsync(selected.Device, new ScrcpyLaunchOptions
+            var profile = _profiles.Get(selected.Serial);
+            await _scrcpy.StartAsync(selected.Device, profile.ToLaunchOptions() with
             {
-                WindowTitle = $"PocketBridge — {selected.FriendlyName} — {selected.Serial}",
-                StayAwake = true
+                WindowTitle = $"PocketBridge — {selected.FriendlyName} — {selected.Serial}"
             });
+            await _profiles.SaveAsync(profile with { LastConnected = DateTimeOffset.Now });
             selected.IsSessionRunning = true;
             SetStatus(LocalizationService.Current.Format("StatusSessionStarted", selected.FriendlyName), StatusKind.Success);
             SessionStateChanged();
@@ -344,6 +379,64 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         await RefreshDevicesAsync(true);
     }
 
+    private async Task ConfigureProfileAsync()
+    {
+        var selected = SelectedDevice;
+        if (selected is null || !await _profileDialog.ShowAsync(selected.Device)) return;
+        selected.Update(selected.Device, _profiles.Get(selected.Serial), selected.IsSessionRunning);
+        OnPropertyChanged(nameof(SelectedDevice));
+        SetStatus(LocalizationService.Current["StatusProfileSaved"], StatusKind.Success);
+    }
+
+    private void ShowSingleView() => IsMultiView = false;
+
+    private async Task StartMultiViewAsync()
+    {
+        IsBusy = true;
+        var failures = new List<string>();
+        try
+        {
+            var activeSerials = ActiveEmbeddedSessions.Select(session => session.Serial).ToHashSet(StringComparer.Ordinal);
+            foreach (var device in Devices.Where(item => item.Device.IsReady && !activeSerials.Contains(item.Serial)).Take(Math.Max(0, 4 - activeSerials.Count)))
+            {
+                try
+                {
+                    var profile = _profiles.Get(device.Serial);
+                    await _embeddedSessions.StartAsync(device.Device, profile.ToLaunchOptions(), _lifetime.Token);
+                    await _profiles.SaveAsync(profile with { LastConnected = DateTimeOffset.Now });
+                    device.IsSessionRunning = true;
+                    activeSerials.Add(device.Serial);
+                }
+                catch (Exception exception)
+                {
+                    failures.Add($"{device.FriendlyName}: {exception.Message}");
+                }
+            }
+            IsMultiView = true;
+            NotifyMultiViewProperties();
+            SetStatus(failures.Count == 0
+                ? LocalizationService.Current.Format("StatusMultiViewStarted", ActiveEmbeddedSessions.Count)
+                : string.Join(Environment.NewLine, failures), failures.Count == 0 ? StatusKind.Success : StatusKind.Warning);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void FocusSession(string serial)
+    {
+        SelectedDevice = Devices.FirstOrDefault(device => device.Serial.Equals(serial, StringComparison.Ordinal));
+        IsMultiView = false;
+    }
+
+    private void NotifyMultiViewProperties()
+    {
+        OnPropertyChanged(nameof(ActiveEmbeddedSessions));
+        OnPropertyChanged(nameof(MultiViewColumns));
+        OnPropertyChanged(nameof(MultiViewRows));
+    }
+
     private async Task PrepareToolsAsync()
     {
         try
@@ -414,6 +507,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void SessionStateChanged()
     {
         OnPropertyChanged(nameof(SessionSummary));
+        NotifyMultiViewProperties();
         NotifyCommands();
     }
 
@@ -440,10 +534,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool CanStop() => SelectedDevice is not null && _embeddedSessions.Get(SelectedDevice.Serial)?.IsRunning == true && !IsBusy;
     private bool CanRestart() => SelectedDevice?.Device.IsReady == true && _embeddedSessions.Get(SelectedDevice.Serial)?.IsRunning == true && !IsBusy;
     private bool CanControl() => SelectedDevice?.Device.IsReady == true && !IsBusy;
+    private bool CanStartMultiView() => Devices.Any(device => device.Device.IsReady) && !IsBusy;
 
     private void NotifyCommands()
     {
-        RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
+        RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
     }
 

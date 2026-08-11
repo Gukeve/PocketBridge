@@ -13,6 +13,7 @@ namespace PocketBridge.Infrastructure.Embedded;
 public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
 {
     private readonly AndroidDevice _device;
+    private readonly ScrcpyLaunchOptions _options;
     private readonly IAdbService _adb;
     private readonly IExecutableLocator _locator;
     private readonly IAppSettingsService _settings;
@@ -23,9 +24,10 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
     private string? _failureReason;
     private long _frameSequence;
 
-    public EmbeddedScrcpySession(AndroidDevice device, IAdbService adb, IExecutableLocator locator, IAppSettingsService settings)
+    public EmbeddedScrcpySession(AndroidDevice device, ScrcpyLaunchOptions options, IAdbService adb, IExecutableLocator locator, IAppSettingsService settings)
     {
         _device = device;
+        _options = options;
         _adb = adb;
         _locator = locator;
         _settings = settings;
@@ -48,7 +50,7 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
         _lifetime?.Dispose();
         _failureReason = null;
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _transport = new ScrcpyTransport(_device, _adb, _locator, _settings);
+        _transport = new ScrcpyTransport(_device, _options, _adb, _locator, _settings);
         try
         {
             await _transport.StartAsync(_lifetime.Token).ConfigureAwait(false);

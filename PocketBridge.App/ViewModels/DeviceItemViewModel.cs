@@ -7,10 +7,12 @@ namespace PocketBridge.App.ViewModels;
 public sealed class DeviceItemViewModel : ObservableObject
 {
     private bool _isSessionRunning;
-    public DeviceItemViewModel(AndroidDevice device, bool isSessionRunning) { Device = device; _isSessionRunning = isSessionRunning; }
+    private DeviceProfile _profile;
+    public DeviceItemViewModel(AndroidDevice device, DeviceProfile profile, bool isSessionRunning) { Device = device; _profile = profile; _isSessionRunning = isSessionRunning; }
     public AndroidDevice Device { get; private set; }
+    public DeviceProfile Profile => _profile;
     public string Serial => Device.Serial;
-    public string FriendlyName => Device.FriendlyName;
+    public string FriendlyName => _profile.DisplayName(Device.FriendlyName);
     public string ModelLine => string.IsNullOrWhiteSpace(Device.Model) ? LocalizationService.Current["ModelUnknown"] : Device.Model;
     public string ConnectionLabel => Device.ConnectionType == DeviceConnectionType.TcpIp ? "TCP/IP" : "USB";
     public string StateLabel => Device.State switch
@@ -32,13 +34,16 @@ public sealed class DeviceItemViewModel : ObservableObject
         set { if (SetProperty(ref _isSessionRunning, value)) OnPropertyChanged(nameof(StateLabel)); }
     }
 
-    public void Update(AndroidDevice device, bool isSessionRunning)
+    public void Update(AndroidDevice device, DeviceProfile profile, bool isSessionRunning)
     {
         var deviceChanged = Device != device;
+        var profileChanged = _profile != profile;
         Device = device;
+        _profile = profile;
         IsSessionRunning = isSessionRunning;
-        if (!deviceChanged) return;
+        if (!deviceChanged && !profileChanged) return;
         OnPropertyChanged(nameof(Device));
+        OnPropertyChanged(nameof(Profile));
         OnPropertyChanged(nameof(Serial));
         OnPropertyChanged(nameof(FriendlyName));
         OnPropertyChanged(nameof(ModelLine));

@@ -21,10 +21,11 @@ public sealed class FeatureDialogService : IFeatureDialogService
     private readonly IAdbFileService _files;
     private readonly IScreenshotService _screenshots;
     private readonly IConfirmationService _confirmation;
+    private readonly IDeviceProfileService _profiles;
 
-    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation)
+    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles)
     {
-        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation;
+        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles;
     }
 
     public async Task<string?> InstallApkAsync(AndroidDevice device, string? apkPath = null)
@@ -41,7 +42,7 @@ public sealed class FeatureDialogService : IFeatureDialogService
         return LocalizationService.Current.Format("ApkInstalledOn", device.FriendlyName);
     }
 
-    public void ShowWifi(AndroidDevice device) => new WifiWindow(device, _wifi) { Owner = Application.Current.MainWindow }.ShowDialog();
+    public void ShowWifi(AndroidDevice device) => new WifiWindow(device, _wifi, _profiles) { Owner = Application.Current.MainWindow }.ShowDialog();
     public void ShowFiles(AndroidDevice device) => new FileManagerWindow(device, _files, _confirmation) { Owner = Application.Current.MainWindow }.Show();
 
     public async Task<string?> CaptureScreenshotAsync(AndroidDevice device)

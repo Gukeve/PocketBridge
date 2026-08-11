@@ -37,12 +37,12 @@ public interface IEmbeddedSessionManager : IAsyncDisposable
     event EventHandler? SessionsChanged;
     IReadOnlyCollection<IEmbeddedDisplaySession> Sessions { get; }
     IEmbeddedDisplaySession? Get(string serial);
-    Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, CancellationToken cancellationToken = default);
+    Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions? options = null, CancellationToken cancellationToken = default);
     Task StopAsync(string serial, CancellationToken cancellationToken = default);
 }
 
 public interface IDeviceDisplaySessionFactory
 {
     IDeviceDisplaySession CreateExternal(AndroidDevice device, ScrcpyLaunchOptions options);
-    IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device);
+    IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device, ScrcpyLaunchOptions options);
 }

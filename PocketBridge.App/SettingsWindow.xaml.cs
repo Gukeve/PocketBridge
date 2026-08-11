@@ -15,11 +15,13 @@ public partial class SettingsWindow : Window
     private readonly IRuntimeToolsService _runtimeTools;
     private readonly IUpdateCheckService _updates;
     private readonly string _initialLanguage;
+    private readonly AppSettings _initialSettings;
 
     public SettingsWindow(AppSettings settings, IRuntimeToolsService runtimeTools, IUpdateCheckService updates)
     {
         _runtimeTools = runtimeTools;
         _updates = updates;
+        _initialSettings = settings;
         _initialLanguage = LocalizationService.NormalizeLanguage(settings.Language);
         InitializeComponent();
         LanguageBox.ItemsSource = new[] { new LanguageOption("ru-RU", "Русский"), new LanguageOption("en-US", "English"), new LanguageOption("zh-CN", "简体中文") };
@@ -54,7 +56,7 @@ public partial class SettingsWindow : Window
     private static void SetComponent(TextBlock target, bool found, string name) { target.Text = $"{(found ? "✓" : "—")} {name}"; target.Foreground = found ? Brush(88, 214, 168) : Brush(170, 180, 197); }
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        Result = new AppSettings { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage }; DialogResult = true;
+        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage }; DialogResult = true;
     }
     private static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     private void OpenScrcpy_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/Genymobile/scrcpy");

@@ -7,7 +7,9 @@ public sealed record ScrcpyLaunchOptions
     public bool AlwaysOnTop { get; init; }
     public bool TurnScreenOff { get; init; }
     public int? MaxSize { get; init; }
+    public int? MaxFps { get; init; }
     public string? VideoBitRate { get; init; }
+    public PreferredVideoCodec VideoCodec { get; init; } = PreferredVideoCodec.H264;
     public bool AudioEnabled { get; init; } = true;
     public bool FullScreen { get; init; }
 }

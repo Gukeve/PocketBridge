@@ -19,6 +19,7 @@ public partial class App : Application
         LocalizationService.Initialize(settings.Load().Language);
         IRuntimeToolsService runtimeTools = new RuntimeToolsService();
         IAdbService adb = new AdbService(locator, settings);
+        IDeviceProfileService profiles = new DeviceProfileService(settings);
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
@@ -29,8 +30,9 @@ public partial class App : Application
             new WifiAdbService(adb),
             new AdbFileService(adb),
             new ScreenshotService(adb),
-            confirmation);
-        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, new SettingsDialogService(settings, runtimeTools, updates), confirmation, featureDialogs);
+            confirmation,
+            profiles);
+        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs);
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();

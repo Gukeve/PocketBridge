@@ -1,0 +1,47 @@
+<Window x:Class="PocketBridge.App.DeviceProfileWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:PocketBridge.App.Localization"
+        Title="{loc:Loc DeviceProfile}" Width="650" Height="700" MinHeight="620"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource WindowBrush}">
+    <Border Margin="20" Padding="24" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Text="{loc:Loc DeviceProfile}" FontSize="24" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SerialText" Margin="0,5,0,22" Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" />
+
+                    <TextBlock Text="{loc:Loc FriendlyName}" FontWeight="SemiBold" Margin="0,0,0,7" />
+                    <TextBox x:Name="FriendlyNameBox" Style="{StaticResource TextField}" MaxLength="80" />
+
+                    <TextBlock Text="{loc:Loc PreferredConnection}" FontWeight="SemiBold" Margin="0,18,0,7" />
+                    <ComboBox x:Name="ConnectionBox" MinHeight="42" Padding="10,6" />
+
+                    <Separator Margin="0,24,0,20" Background="{StaticResource BorderBrush}" />
+                    <TextBlock Text="{loc:Loc MirroringQuality}" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Text="{loc:Loc QualityHelp}" Margin="0,5,0,16" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Text="{loc:Loc Resolution}" Margin="0,0,0,7" /><ComboBox x:Name="ResolutionBox" IsEditable="True" MinHeight="42" /></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Text="FPS" Margin="0,0,0,7" /><ComboBox x:Name="FpsBox" IsEditable="True" MinHeight="42" /></StackPanel>
+                        <StackPanel Grid.Column="4"><TextBlock Text="{loc:Loc Bitrate}" Margin="0,0,0,7" /><ComboBox x:Name="BitrateBox" IsEditable="True" MinHeight="42" /></StackPanel>
+                    </Grid>
+                    <TextBlock Text="{loc:Loc Codec}" FontWeight="SemiBold" Margin="0,18,0,7" />
+                    <ComboBox x:Name="CodecBox" MinHeight="42" IsEnabled="False" />
+                    <TextBlock Text="{loc:Loc CodecCapabilityHelp}" Margin="0,7,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+
+                    <Separator Margin="0,24,0,18" Background="{StaticResource BorderBrush}" />
+                    <CheckBox x:Name="StayAwakeBox" Content="{loc:Loc StayAwake}" Margin="0,5" />
+                    <CheckBox x:Name="ScreenOffBox" Content="{loc:Loc ScreenOffOnConnect}" Margin="0,5" />
+                    <CheckBox x:Name="AlwaysOnTopBox" Content="{loc:Loc AlwaysOnTop}" Margin="0,5" />
+                    <CheckBox x:Name="AudioBox" Content="{loc:Loc AudioEnabled}" Margin="0,5" />
+                </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                <Button Style="{StaticResource BaseButton}" IsCancel="True" Content="{loc:Loc Cancel}" Margin="0,0,10,0" />
+                <Button Style="{StaticResource PrimaryButton}" Click="Save_Click" Content="{loc:Loc Save}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

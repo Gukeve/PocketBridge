@@ -107,7 +107,14 @@ Acceptance: validated options generate correct external arguments and embedded s
 
 ## First implementation slice
 
-This task starts with P0.1, the validated settings model needed by P0.2/P0.3, then integrates multi-view and quality options incrementally. P1 features are added only where the P0 ownership model makes their target unambiguous.
+Implemented on `next` in this stage:
+
+- P0.1 persistent, serial-keyed profiles with aliases and atomic JSON persistence;
+- P0.2 adaptive 1/2/4 Multi View over independent embedded sessions, with double-click focus;
+- P0.3 validated resolution, FPS, bitrate, H.264 capability disclosure, and external-session preferences;
+- the first P1.4 slice: remembered last successful endpoint and Android 11+ pairing-code flow without persisting the code.
+
+Remaining P0/P1 work continues in later logical commits. Features requiring device capabilities are not considered hardware-accepted until the manual matrix below is executed.
 
 ## Verification matrix
 

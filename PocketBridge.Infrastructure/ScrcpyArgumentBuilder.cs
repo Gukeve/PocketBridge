@@ -17,7 +17,9 @@ public static class ScrcpyArgumentBuilder
         if (options.AlwaysOnTop) arguments.Add("--always-on-top");
         if (options.TurnScreenOff) arguments.Add("--turn-screen-off");
         if (options.MaxSize is > 0) arguments.Add($"--max-size={options.MaxSize}");
+        if (options.MaxFps is > 0) arguments.Add($"--max-fps={options.MaxFps}");
         if (!string.IsNullOrWhiteSpace(options.VideoBitRate)) arguments.Add($"--video-bit-rate={options.VideoBitRate}");
+        arguments.Add($"--video-codec={options.VideoCodec.ToString().ToLowerInvariant()}");
         if (!options.AudioEnabled) arguments.Add("--no-audio");
         if (options.FullScreen) arguments.Add("--fullscreen");
         return arguments;

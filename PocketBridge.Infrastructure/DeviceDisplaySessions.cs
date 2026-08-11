@@ -21,7 +21,7 @@ public sealed class DeviceDisplaySessionFactory : IDeviceDisplaySessionFactory
     public IDeviceDisplaySession CreateExternal(AndroidDevice device, ScrcpyLaunchOptions options) =>
         new ExternalScrcpySession(device, options, _scrcpy);
 
-    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device) => new EmbeddedScrcpySession(device, _adb, _locator, _settings);
+    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device, ScrcpyLaunchOptions options) => new EmbeddedScrcpySession(device, options, _adb, _locator, _settings);
 }
 
 public sealed class ExternalScrcpySession : IDeviceDisplaySession

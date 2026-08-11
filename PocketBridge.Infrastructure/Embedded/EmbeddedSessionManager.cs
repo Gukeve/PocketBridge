@@ -11,7 +11,7 @@ public sealed class EmbeddedSessionManager(IDeviceDisplaySessionFactory factory)
     public IReadOnlyCollection<IEmbeddedDisplaySession> Sessions { get { lock (_sessions) return _sessions.Values.ToArray(); } }
     public IEmbeddedDisplaySession? Get(string serial) { lock (_sessions) return _sessions.GetValueOrDefault(serial); }
 
-    public async Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, CancellationToken cancellationToken = default)
+    public async Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions? options = null, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -22,7 +22,7 @@ public sealed class EmbeddedSessionManager(IDeviceDisplaySessionFactory factory)
                 if (!existing.IsRunning) await existing.StartAsync(cancellationToken).ConfigureAwait(false);
                 return existing;
             }
-            var session = factory.CreateEmbedded(device);
+            var session = factory.CreateEmbedded(device, options ?? new ScrcpyLaunchOptions());
             session.StateChanged += OnStateChanged;
             lock (_sessions) _sessions.Add(device.Serial, session);
             try { await session.StartAsync(cancellationToken).ConfigureAwait(false); }

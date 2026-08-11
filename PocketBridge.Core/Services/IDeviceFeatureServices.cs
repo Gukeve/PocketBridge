@@ -12,6 +12,7 @@ public interface IWifiAdbService
     Task<string> GetWifiAddressAsync(string serial);
     Task<WifiConnectionResult> EnableTcpIpAsync(string serial, int port = 5555);
     Task<WifiConnectionResult> ConnectAsync(string ipAddress, int port = 5555);
+    Task<WifiConnectionResult> PairAsync(string ipAddress, int port, string pairingCode);
 }
 
 public interface IAdbFileService

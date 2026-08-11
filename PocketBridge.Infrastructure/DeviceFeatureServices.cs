@@ -57,6 +57,18 @@ public sealed partial class WifiAdbService : IWifiAdbService
         return new WifiConnectionResult(endpoint, result.StandardOutput.Trim());
     }
 
+    public async Task<WifiConnectionResult> PairAsync(string ipAddress, int port, string pairingCode)
+    {
+        ValidatePort(port);
+        if (!IPAddress.TryParse(ipAddress, out var address) || address.AddressFamily != AddressFamily.InterNetwork) throw new ArgumentException("Enter a valid IPv4 address.", nameof(ipAddress));
+        if (pairingCode.Length != 6 || pairingCode.Any(character => !char.IsAsciiDigit(character))) throw new ArgumentException("Enter the six-digit pairing code.", nameof(pairingCode));
+        var endpoint = $"{address}:{port}";
+        var result = await _adb.ExecuteHostAsync("pair", endpoint, pairingCode).ConfigureAwait(false);
+        if (!result.IsSuccess || result.StandardOutput.Contains("failed", StringComparison.OrdinalIgnoreCase) || result.StandardOutput.Contains("cannot", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput.Trim() : result.StandardError.Trim());
+        return new WifiConnectionResult(endpoint, result.StandardOutput.Trim());
+    }
+
     private static void ValidatePort(int port) { if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port)); }
     [GeneratedRegex(@"\binet\s+(\d{1,3}(?:\.\d{1,3}){3})/")]
     private static partial Regex IpAddressRegex();

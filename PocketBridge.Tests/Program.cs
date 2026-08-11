@@ -17,7 +17,10 @@ var tests = new (string Name, Action Run)[]
     ("Validates a complete runtime directory", ValidatesRuntimeDirectory),
     ("Validates the split managed runtime", ValidatesSplitRuntime),
     ("Serializes scrcpy 4.1 touch messages", SerializesTouchMessage),
-    ("Keeps embedded sessions alive when switching devices", KeepsEmbeddedSessionsAlive)
+    ("Keeps embedded sessions alive when switching devices", KeepsEmbeddedSessionsAlive),
+    ("Persists independent device profiles", PersistsIndependentDeviceProfiles),
+    ("Builds profile quality arguments", BuildsProfileQualityArguments),
+    ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint)
 };
 
 var failed = 0;
@@ -198,6 +201,58 @@ static void KeepsEmbeddedSessionsAlive()
     manager.DisposeAsync().AsTask().GetAwaiter().GetResult();
 }
 
+static void PersistsIndependentDeviceProfiles()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"PocketBridge-profiles-{Guid.NewGuid():N}");
+    var path = Path.Combine(root, "settings.json");
+    try
+    {
+        var settings = new JsonAppSettingsService(path);
+        var profiles = new DeviceProfileService(settings);
+        profiles.SaveAsync(new DeviceProfile { Serial = "SERIAL-A", FriendlyName = "Lab phone", PreferredFps = 45 }).GetAwaiter().GetResult();
+        profiles.SaveAsync(new DeviceProfile { Serial = "SERIAL-B", FriendlyName = "Demo phone", PreferredBitrateMbps = 8 }).GetAwaiter().GetResult();
+        var reloaded = new DeviceProfileService(new JsonAppSettingsService(path));
+        Equal("Lab phone", reloaded.Get("SERIAL-A").FriendlyName);
+        Equal(45, reloaded.Get("SERIAL-A").PreferredFps);
+        Equal("Demo phone", reloaded.Get("SERIAL-B").FriendlyName);
+        Equal(8, reloaded.Get("SERIAL-B").PreferredBitrateMbps);
+        Equal(2, reloaded.GetAll().Count);
+    }
+    finally
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, true);
+    }
+}
+
+static void BuildsProfileQualityArguments()
+{
+    var device = new AndroidDevice("QUALITY-SERIAL", "Phone", null, null, null, DeviceConnectionType.Usb, AndroidDeviceState.Device);
+    var profile = new DeviceProfile
+    {
+        Serial = device.Serial,
+        PreferredResolution = 1600,
+        PreferredFps = 45,
+        PreferredBitrateMbps = 12,
+        AlwaysOnTop = true,
+        ScreenOffOnConnect = true
+    };
+    var arguments = ScrcpyArgumentBuilder.Build(device, profile.ToLaunchOptions());
+    True(arguments.Contains("--max-size=1600"), "Profile resolution was not applied.");
+    True(arguments.Contains("--max-fps=45"), "Profile FPS was not applied.");
+    True(arguments.Contains("--video-bit-rate=12M"), "Profile bitrate was not applied.");
+    True(arguments.Contains("--video-codec=h264"), "Profile codec was not applied.");
+    True(arguments.Contains("--always-on-top"), "Always-on-top was not applied.");
+    True(arguments.Contains("--turn-screen-off"), "Screen-off was not applied.");
+}
+
+static void PairsWirelessDebuggingEndpoint()
+{
+    var adb = new RecordingAdbService(new AdbCommandResult(0, "Successfully paired", string.Empty));
+    var result = new WifiAdbService(adb).PairAsync("192.0.2.20", 37123, "123456").GetAwaiter().GetResult();
+    Equal("192.0.2.20:37123", result.Address);
+    True(adb.LastArguments.SequenceEqual(new[] { "pair", "192.0.2.20:37123", "123456" }), "Pairing was not scoped to the explicit endpoint.");
+}
+
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected '{expected}', got '{actual}'.");
@@ -225,7 +280,7 @@ sealed class RecordingAdbService : IAdbService
 sealed class FakeDisplaySessionFactory : IDeviceDisplaySessionFactory
 {
     public IDeviceDisplaySession CreateExternal(AndroidDevice device, ScrcpyLaunchOptions options) => throw new NotSupportedException();
-    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device) => new FakeEmbeddedSession(device.Serial);
+    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device, ScrcpyLaunchOptions options) => new FakeEmbeddedSession(device.Serial);
 }
 
 sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
