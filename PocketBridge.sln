@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PocketBridge.Core", "PocketBridge.Core\PocketBridge.Core.csproj", "{00FA8C88-DA62-4410-B410-231263BAC16C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PocketBridge.Infrastructure", "PocketBridge.Infrastructure\PocketBridge.Infrastructure.csproj", "{AA53F339-FB95-40B2-810A-E9C24DAB0942}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PocketBridge.App", "PocketBridge.App\PocketBridge.App.csproj", "{AC55320B-A324-4B9E-B9AB-16763587660A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PocketBridge.Tests", "PocketBridge.Tests\PocketBridge.Tests.csproj", "{CF38EB55-8A11-4BA2-B4EE-158E01E1F9BB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{00FA8C88-DA62-4410-B410-231263BAC16C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{00FA8C88-DA62-4410-B410-231263BAC16C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{00FA8C88-DA62-4410-B410-231263BAC16C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{00FA8C88-DA62-4410-B410-231263BAC16C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA53F339-FB95-40B2-810A-E9C24DAB0942}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA53F339-FB95-40B2-810A-E9C24DAB0942}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA53F339-FB95-40B2-810A-E9C24DAB0942}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA53F339-FB95-40B2-810A-E9C24DAB0942}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC55320B-A324-4B9E-B9AB-16763587660A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC55320B-A324-4B9E-B9AB-16763587660A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC55320B-A324-4B9E-B9AB-16763587660A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC55320B-A324-4B9E-B9AB-16763587660A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF38EB55-8A11-4BA2-B4EE-158E01E1F9BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF38EB55-8A11-4BA2-B4EE-158E01E1F9BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF38EB55-8A11-4BA2-B4EE-158E01E1F9BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF38EB55-8A11-4BA2-B4EE-158E01E1F9BB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

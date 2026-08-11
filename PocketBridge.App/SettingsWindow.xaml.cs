@@ -1,0 +1,90 @@
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using PocketBridge.App.Localization;
+using PocketBridge.Core.Models;
+using PocketBridge.Core.Services;
+
+namespace PocketBridge.App;
+
+public partial class SettingsWindow : Window
+{
+    private readonly IRuntimeToolsService _runtimeTools;
+    private readonly IUpdateCheckService _updates;
+    private readonly string _initialLanguage;
+
+    public SettingsWindow(AppSettings settings, IRuntimeToolsService runtimeTools, IUpdateCheckService updates)
+    {
+        _runtimeTools = runtimeTools;
+        _updates = updates;
+        _initialLanguage = LocalizationService.NormalizeLanguage(settings.Language);
+        InitializeComponent();
+        LanguageBox.ItemsSource = new[] { new LanguageOption("ru-RU", "Русский"), new LanguageOption("en-US", "English"), new LanguageOption("zh-CN", "简体中文") };
+        LanguageBox.SelectedValuePath = nameof(LanguageOption.Code);
+        LanguageBox.DisplayMemberPath = nameof(LanguageOption.Name);
+        LanguageBox.SelectedValue = _initialLanguage;
+        ToolsDirectoryBox.Text = runtimeTools.DefaultToolsDirectory;
+        VersionText.Text = LocalizationService.Current.Format("VersionFormat", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0");
+        UpdateComponentStatus();
+    }
+
+    public AppSettings? Result { get; private set; }
+
+    private void ToolsDirectoryBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateComponentStatus();
+    private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => LanguageRestartText.Visibility = Equals(LanguageBox.SelectedValue, _initialLanguage) ? Visibility.Collapsed : Visibility.Visible;
+
+    private void UpdateComponentStatus()
+    {
+        if (!IsInitialized) return;
+        RuntimeToolsStatus status;
+        try { status = _runtimeTools.Inspect(ToolsDirectoryBox.Text); }
+        catch
+        {
+            SetComponent(AdbStatusText, false, "adb.exe"); SetComponent(ScrcpyStatusText, false, "scrcpy.exe"); SetComponent(ServerStatusText, false, "scrcpy-server");
+            ValidationText.Text = LocalizationService.Current["RuntimeIncomplete"]; return;
+        }
+        SetComponent(AdbStatusText, status.HasAdb, "adb.exe"); SetComponent(ScrcpyStatusText, status.HasScrcpy, "scrcpy.exe"); SetComponent(ServerStatusText, status.HasScrcpyServer, "scrcpy-server");
+        ValidationText.Text = LocalizationService.Current[status.IsComplete ? "AllRuntimeFound" : "RuntimeIncomplete"];
+        ValidationText.Foreground = status.IsComplete ? Brush(88, 214, 168) : Brush(243, 191, 99);
+    }
+
+    private static void SetComponent(TextBlock target, bool found, string name) { target.Text = $"{(found ? "✓" : "—")} {name}"; target.Foreground = found ? Brush(88, 214, 168) : Brush(170, 180, 197); }
+    private void Save_Click(object sender, RoutedEventArgs e)
+    {
+        Result = new AppSettings { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage }; DialogResult = true;
+    }
+    private static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    private void OpenScrcpy_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/Genymobile/scrcpy");
+    private void OpenLicense_Click(object sender, RoutedEventArgs e)
+    {
+        OpenBundledDocument("LICENSE");
+    }
+    private void OpenThirdParty_Click(object sender, RoutedEventArgs e) => OpenBundledDocument("THIRD_PARTY_NOTICES.md");
+    private static void OpenBundledDocument(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, fileName);
+        if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    }
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var statuses = await _updates.CheckAsync();
+            var lines = statuses.Select(status => LocalizationService.Current.Format(
+                "ComponentVersionFormat",
+                status.Component,
+                status.InstalledVersion ?? LocalizationService.Current["NotInstalled"],
+                status.AvailableVersion ?? LocalizationService.Current["NotPublished"]));
+            MessageBox.Show(string.Join(Environment.NewLine, lines), LocalizationService.Current["CheckUpdates"], MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(LocalizationService.Current.Format("UpdateCheckFailed", exception.Message), LocalizationService.Current["CheckUpdates"], MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+    private static SolidColorBrush Brush(byte red, byte green, byte blue) => new(Color.FromRgb(red, green, blue));
+    private sealed record LanguageOption(string Code, string Name);
+}

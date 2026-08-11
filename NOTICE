@@ -1,0 +1,12 @@
+PocketBridge
+Copyright 2026 PocketBridge contributors
+
+Portions of the scrcpy protocol client are adapted from scrcpy:
+Copyright (C) 2018 Genymobile
+Copyright (C) 2018-2026 Romain Vimont
+
+PocketBridge is an independent project. It is not affiliated with, sponsored
+by, or endorsed by Genymobile. scrcpy is a project of its respective authors
+and contributors.
+
+See THIRD_PARTY_NOTICES.md and licenses/ for all third-party notices.

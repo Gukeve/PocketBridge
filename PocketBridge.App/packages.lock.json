@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net8.0-windows7.0": {
+      "FFmpeg.AutoGen": {
+        "type": "Transitive",
+        "resolved": "8.0.0.1",
+        "contentHash": "GrkNQjYwjOI56yh3cKhOP4yGm74gBXY2qU0blBEBfQtIho9SD6KemnVvh/loouop8wGnPHOrpL/WB3htgT2jkg=="
+      },
+      "pocketbridge.core": {
+        "type": "Project"
+      },
+      "pocketbridge.infrastructure": {
+        "type": "Project",
+        "dependencies": {
+          "FFmpeg.AutoGen": "[8.0.0.1, )",
+          "PocketBridge.Core": "[1.0.0, )"
+        }
+      }
+    },
+    "net8.0-windows7.0/win-x64": {}
+  }
+}

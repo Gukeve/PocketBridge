@@ -1,0 +1,101 @@
+name: Build Windows x64 artifact
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up pinned .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.423
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Restore locked dependencies
+        shell: pwsh
+        run: dotnet restore .\PocketBridge.sln --locked-mode
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build .\PocketBridge.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Run checks
+        shell: pwsh
+        run: dotnet run --project .\PocketBridge.Tests\PocketBridge.Tests.csproj -c Release --no-build
+
+      - name: Publish framework-dependent Windows x64 build
+        shell: pwsh
+        run: |
+          dotnet publish .\PocketBridge.App\PocketBridge.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained false `
+            --no-restore `
+            -p:BundleRuntime=false `
+            -p:DebugSymbols=false `
+            -p:DebugType=None `
+            -p:ContinuousIntegrationBuild=true `
+            -o .\dist\PocketBridge
+
+      - name: Verify artifact policy
+        shell: pwsh
+        run: |
+          $forbidden = @(
+            'adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll',
+            'scrcpy.exe', 'scrcpy-server', 'avcodec-*.dll',
+            'avformat-*.dll', 'avutil-*.dll', 'swresample-*.dll',
+            'SDL3.dll', 'libusb-1.0.dll'
+          )
+          foreach ($pattern in $forbidden) {
+            $match = Get-ChildItem -LiteralPath .\dist\PocketBridge -Recurse -File -Filter $pattern
+            if ($match) { throw "Forbidden bundled runtime file: $($match.FullName)" }
+          }
+          foreach ($required in @(
+            'PocketBridge.exe', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md',
+            'licenses\FFmpeg.AutoGen-MIT.txt', 'licenses\FFmpeg-LGPL-2.1.txt',
+            'licenses\Android-Platform-Tools-37.0.0-NOTICE.txt',
+            'licenses\dotnet-runtime-MIT.txt',
+            'licenses\dotnet-runtime-ThirdPartyNotices.txt'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path '.\dist\PocketBridge' $required) -PathType Leaf)) {
+              throw "Release artifact is missing $required"
+            }
+          }
+
+      - name: Write build metadata and ZIP
+        shell: pwsh
+        run: |
+          $metadata = [ordered]@{
+            repository = '${{ github.repository }}'
+            commit = '${{ github.sha }}'
+            ref = '${{ github.ref }}'
+            dotnetSdk = (dotnet --version)
+            target = 'net8.0-windows/win-x64'
+            selfContained = $false
+            bundledNativeRuntime = $false
+            generatedAtUtc = [DateTime]::UtcNow.ToString('O')
+          }
+          $metadata | ConvertTo-Json | Set-Content -LiteralPath .\dist\PocketBridge\BUILD_INFO.json -Encoding UTF8
+          Compress-Archive -LiteralPath .\dist\PocketBridge\* -DestinationPath .\dist\PocketBridge-win-x64.zip
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketBridge-win-x64
+          path: dist/PocketBridge-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
