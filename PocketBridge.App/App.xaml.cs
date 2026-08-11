@@ -40,7 +40,9 @@ public partial class App : Application
             profiles,
             transfers,
             new ApplicationService(adb),
-            settings);
+            settings,
+            new DeviceInformationService(adb),
+            new AdbConsoleService(locator, settings));
         var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings);
         var window = new MainWindow(viewModel);
         MainWindow = window;

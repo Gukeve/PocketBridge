@@ -25,7 +25,9 @@ var tests = new (string Name, Action Run)[]
     ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops),
     ("Processes serial-scoped file transfer queue", ProcessesFileTransferQueue),
     ("Parses Android application metadata", ParsesAndroidApplicationMetadata),
-    ("Application actions remain serial scoped", ApplicationActionsAreSerialScoped)
+    ("Application actions remain serial scoped", ApplicationActionsAreSerialScoped),
+    ("Parses device properties", ParsesDeviceProperties),
+    ("Parses quoted ADB console commands", ParsesAdbConsoleCommand)
 };
 
 var failed = 0;
@@ -326,6 +328,18 @@ static void ApplicationActionsAreSerialScoped()
     _ = new ApplicationService(adb).LaunchAsync("APP-SERIAL", "com.example.alpha").GetAwaiter().GetResult();
     Equal("APP-SERIAL", adb.LastSerial);
     True(adb.LastArguments.SequenceEqual(new[] { "shell", "monkey", "-p", "com.example.alpha", "-c", "android.intent.category.LAUNCHER", "1" }), "Unexpected application launch arguments.");
+}
+
+static void ParsesDeviceProperties()
+{
+    var values = DeviceInformationService.ParseProperties("[ro.product.model]: [Pixel Test]\n[ro.build.version.sdk]: [35]\n");
+    Equal("Pixel Test", values["ro.product.model"]); Equal("35", values["ro.build.version.sdk"]);
+}
+
+static void ParsesAdbConsoleCommand()
+{
+    var arguments = AdbConsoleService.Parse("shell am start -d \"https://example.invalid/a b\"");
+    True(arguments.SequenceEqual(new[] { "shell", "am", "start", "-d", "https://example.invalid/a b" }), "Quoted ADB arguments were not preserved.");
 }
 
 static void True(bool condition, string message)

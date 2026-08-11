@@ -93,6 +93,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OpenTransfersCommand = new RelayCommand(_featureDialogs.ShowTransfers);
         OpenApplicationsCommand = new RelayCommand(OpenApplications, CanControl);
         ToggleRecordingCommand = new AsyncRelayCommand(ToggleRecordingAsync, CanControl);
+        OpenDeviceInformationCommand = new RelayCommand(OpenDeviceInformation, CanControl);
+        OpenAdbConsoleCommand = new RelayCommand(OpenAdbConsole, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
@@ -129,6 +131,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand OpenTransfersCommand { get; }
     public RelayCommand OpenApplicationsCommand { get; }
     public AsyncRelayCommand ToggleRecordingCommand { get; }
+    public RelayCommand OpenDeviceInformationCommand { get; }
+    public RelayCommand OpenAdbConsoleCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
 
@@ -348,6 +352,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var selected = SelectedDevice;
         if (selected is not null) _featureDialogs.ShowApplications(selected.Device);
     }
+    private void OpenDeviceInformation() { if (SelectedDevice is { } selected) _featureDialogs.ShowDeviceInformation(selected.Device); }
+    private void OpenAdbConsole() { if (SelectedDevice is { } selected) _featureDialogs.ShowAdbConsole(selected.Device); }
 
     private async Task OpenWifiAsync()
     {
@@ -701,7 +707,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged();
     }
 
     private void SetStatus(string message, StatusKind kind)
