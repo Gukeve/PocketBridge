@@ -91,7 +91,7 @@ public sealed class FileTransferQueueService : IFileTransferQueueService
             Changed?.Invoke(this, EventArgs.Empty);
             try
             {
-                var progress = new Progress<double>(value => { lock (entry.Gate) entry.Progress = value; Changed?.Invoke(this, EventArgs.Empty); });
+                var progress = new Progress<double>(value => { lock (entry.Gate) { if (entry.State == FileTransferState.Transferring) entry.Progress = value; } Changed?.Invoke(this, EventArgs.Empty); });
                 var result = entry.Request.Operation == FileTransferOperation.InstallApk
                     ? await _executor.InstallApkAsync(entry.Request.Serial, entry.Request.Source, progress, entry.Cancellation.Token).ConfigureAwait(false)
                     : await _executor.UploadAsync(entry.Request.Serial, entry.Request.Source, entry.Request.Destination, progress, entry.Cancellation.Token).ConfigureAwait(false);
