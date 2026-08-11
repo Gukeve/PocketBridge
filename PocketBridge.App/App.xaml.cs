@@ -35,7 +35,8 @@ public partial class App : Application
             new ScreenshotService(adb),
             confirmation,
             profiles,
-            transfers);
+            transfers,
+            new ApplicationService(adb));
         var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs);
         var window = new MainWindow(viewModel);
         MainWindow = window;

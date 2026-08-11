@@ -86,6 +86,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         WifiCommand = new AsyncRelayCommand(OpenWifiAsync, CanControl);
         ScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, CanControl);
         OpenTransfersCommand = new RelayCommand(_featureDialogs.ShowTransfers);
+        OpenApplicationsCommand = new RelayCommand(OpenApplications, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
@@ -116,6 +117,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand WifiCommand { get; }
     public AsyncRelayCommand ScreenshotCommand { get; }
     public RelayCommand OpenTransfersCommand { get; }
+    public RelayCommand OpenApplicationsCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
 
@@ -324,6 +326,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         var selected = SelectedDevice;
         if (selected is not null) _featureDialogs.ShowFiles(selected.Device);
+    }
+
+    private void OpenApplications()
+    {
+        var selected = SelectedDevice;
+        if (selected is not null) _featureDialogs.ShowApplications(selected.Device);
     }
 
     private async Task OpenWifiAsync()
@@ -646,7 +654,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged();
     }
 
     private void SetStatus(string message, StatusKind kind)

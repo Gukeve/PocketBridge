@@ -23,7 +23,9 @@ var tests = new (string Name, Action Run)[]
     ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint),
     ("Serializes clipboard protocol messages", SerializesClipboardMessages),
     ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops),
-    ("Processes serial-scoped file transfer queue", ProcessesFileTransferQueue)
+    ("Processes serial-scoped file transfer queue", ProcessesFileTransferQueue),
+    ("Parses Android application metadata", ParsesAndroidApplicationMetadata),
+    ("Application actions remain serial scoped", ApplicationActionsAreSerialScoped)
 };
 
 var failed = 0;
@@ -307,6 +309,23 @@ static void ProcessesFileTransferQueue()
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected '{expected}', got '{actual}'.");
+}
+
+static void ParsesAndroidApplicationMetadata()
+{
+    var packages = ApplicationService.ParsePackageList("package:com.example.alpha\nignored\npackage:android.system\n");
+    True(packages.SequenceEqual(new[] { "com.example.alpha", "android.system" }), "Package list was not parsed safely.");
+    var versions = ApplicationService.ParseVersions("Package [com.example.alpha] (abc):\n  versionCode=42 minSdk=23\n  versionName=1.2.3\n");
+    Equal("1.2.3", versions["com.example.alpha"].VersionName);
+    Equal(42L, versions["com.example.alpha"].VersionCode);
+}
+
+static void ApplicationActionsAreSerialScoped()
+{
+    var adb = new RecordingAdbService(new AdbCommandResult(0, "Events injected: 1", string.Empty));
+    _ = new ApplicationService(adb).LaunchAsync("APP-SERIAL", "com.example.alpha").GetAwaiter().GetResult();
+    Equal("APP-SERIAL", adb.LastSerial);
+    True(adb.LastArguments.SequenceEqual(new[] { "shell", "monkey", "-p", "com.example.alpha", "-c", "android.intent.category.LAUNCHER", "1" }), "Unexpected application launch arguments.");
 }
 
 static void True(bool condition, string message)

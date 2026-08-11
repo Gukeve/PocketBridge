@@ -15,6 +15,7 @@ public interface IFeatureDialogService
     Task<string?> CaptureScreenshotAsync(AndroidDevice device);
     Task<int> QueueDroppedFilesAsync(AndroidDevice device, IReadOnlyList<string> files);
     void ShowTransfers();
+    void ShowApplications(AndroidDevice device);
 }
 
 public sealed class FeatureDialogService : IFeatureDialogService
@@ -26,11 +27,12 @@ public sealed class FeatureDialogService : IFeatureDialogService
     private readonly IConfirmationService _confirmation;
     private readonly IDeviceProfileService _profiles;
     private readonly IFileTransferQueueService _transfers;
+    private readonly IApplicationService _applications;
     private TransferQueueWindow? _transferWindow;
 
-    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers)
+    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications)
     {
-        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers;
+        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications;
     }
 
     public async Task<string?> InstallApkAsync(AndroidDevice device, string? apkPath = null)
@@ -88,6 +90,8 @@ public sealed class FeatureDialogService : IFeatureDialogService
         _transferWindow.Closed += (_, _) => _transferWindow = null;
         _transferWindow.Show();
     }
+
+    public void ShowApplications(AndroidDevice device) => new ApplicationManagerWindow(device, _applications, _apkInstaller, _confirmation) { Owner = Application.Current.MainWindow }.Show();
 
     private static string NormalizeDestination(string value)
     {
