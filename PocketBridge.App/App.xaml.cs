@@ -11,6 +11,7 @@ namespace PocketBridge.App;
 
 public partial class App : Application
 {
+    private IFileTransferQueueService? _transfers;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -20,6 +21,8 @@ public partial class App : Application
         IRuntimeToolsService runtimeTools = new RuntimeToolsService();
         IAdbService adb = new AdbService(locator, settings);
         IDeviceProfileService profiles = new DeviceProfileService(settings);
+        IFileTransferQueueService transfers = new FileTransferQueueService(new AdbTransferExecutor(locator, settings));
+        _transfers = transfers;
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
@@ -31,11 +34,18 @@ public partial class App : Application
             new AdbFileService(adb),
             new ScreenshotService(adb),
             confirmation,
-            profiles);
+            profiles,
+            transfers);
         var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs);
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();
         _ = viewModel.InitializeAsync();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _transfers?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        base.OnExit(e);
     }
 }

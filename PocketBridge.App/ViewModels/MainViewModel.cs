@@ -85,6 +85,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         InstallApkCommand = new AsyncRelayCommand(InstallApkAsync, CanControl);
         WifiCommand = new AsyncRelayCommand(OpenWifiAsync, CanControl);
         ScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, CanControl);
+        OpenTransfersCommand = new RelayCommand(_featureDialogs.ShowTransfers);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
@@ -114,6 +115,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand InstallApkCommand { get; }
     public AsyncRelayCommand WifiCommand { get; }
     public AsyncRelayCommand ScreenshotCommand { get; }
+    public RelayCommand OpenTransfersCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
 
@@ -334,7 +336,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private async Task InstallApkAsync() => await InstallApkAsync(null);
 
-    public async Task InstallDroppedApkAsync(string apkPath) => await InstallApkAsync(apkPath);
+    public async Task HandleDroppedFilesAsync(IReadOnlyList<string> files, DeviceItemViewModel? target = null)
+    {
+        var device = target?.Device ?? SelectedDevice?.Device;
+        if (device is null) { SetStatus(LocalizationService.Current["ChooseDevice"], StatusKind.Warning); return; }
+        try
+        {
+            var count = await _featureDialogs.QueueDroppedFilesAsync(device, files);
+            if (count > 0) SetStatus(LocalizationService.Current.Format("StatusTransfersQueued", count, target?.FriendlyName ?? SelectedDevice?.FriendlyName ?? device.FriendlyName), StatusKind.Success);
+        }
+        catch (Exception exception) { SetStatus(LocalizationService.Current.Format("FileOperationFailed", exception.Message), StatusKind.Error); }
+    }
 
     private async Task InstallApkAsync(string? apkPath)
     {

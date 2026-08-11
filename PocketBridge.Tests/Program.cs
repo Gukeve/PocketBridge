@@ -22,7 +22,8 @@ var tests = new (string Name, Action Run)[]
     ("Builds profile quality arguments", BuildsProfileQualityArguments),
     ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint),
     ("Serializes clipboard protocol messages", SerializesClipboardMessages),
-    ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops)
+    ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops),
+    ("Processes serial-scoped file transfer queue", ProcessesFileTransferQueue)
 };
 
 var failed = 0;
@@ -278,6 +279,31 @@ static void PreventsClipboardFeedbackLoops()
     True(tracker.ObserveWindows("beta") is null, "Windows echo created a feedback loop.");
 }
 
+static void ProcessesFileTransferQueue()
+{
+    var path = Path.Combine(Path.GetTempPath(), $"PocketBridge-transfer-{Guid.NewGuid():N}.txt");
+    File.WriteAllText(path, "test");
+    var executor = new RecordingTransferExecutor();
+    var queue = new FileTransferQueueService(executor);
+    try
+    {
+        var id = queue.Enqueue(new[] { new FileTransferRequest(path, "/sdcard/Download/test.txt", "QUEUE-SERIAL", FileTransferOperation.Upload) }).Single();
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        while (queue.Items.Single(item => item.Id == id).State is FileTransferState.Waiting or FileTransferState.Transferring && DateTime.UtcNow < deadline) Thread.Sleep(10);
+        var completed = queue.Items.Single(item => item.Id == id);
+        Equal(FileTransferState.Completed, completed.State);
+        Equal(1d, completed.Progress);
+        Equal("QUEUE-SERIAL", executor.Serial);
+        Equal("/sdcard/Download/test.txt", executor.Destination);
+        Equal(1, queue.ClearCompleted());
+    }
+    finally
+    {
+        queue.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        File.Delete(path);
+    }
+}
+
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected '{expected}', got '{actual}'.");
@@ -330,4 +356,16 @@ sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
     public Task RequestClipboardAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendClipboardAsync(string text, long sequence, bool paste = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public async ValueTask DisposeAsync() => await StopAsync();
+}
+
+sealed class RecordingTransferExecutor : IAdbTransferExecutor
+{
+    public string? Serial { get; private set; }
+    public string? Destination { get; private set; }
+    public Task<AdbCommandResult> UploadAsync(string serial, string source, string destination, IProgress<double> progress, CancellationToken cancellationToken)
+    {
+        Serial = serial; Destination = destination; progress.Report(0.5); progress.Report(1);
+        return Task.FromResult(new AdbCommandResult(0, "1 file pushed", string.Empty));
+    }
+    public Task<AdbCommandResult> InstallApkAsync(string serial, string source, IProgress<double> progress, CancellationToken cancellationToken) => throw new NotSupportedException();
 }

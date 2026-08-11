@@ -22,8 +22,15 @@ public partial class MainWindow : Window
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
         var files = e.Data.GetData(DataFormats.FileDrop) as string[];
-        var apk = files?.FirstOrDefault(path => Path.GetExtension(path).Equals(".apk", StringComparison.OrdinalIgnoreCase));
-        if (apk is not null) await _viewModel.InstallDroppedApkAsync(apk);
+        if (files is { Length: > 0 }) await _viewModel.HandleDroppedFilesAsync(files);
+        e.Handled = true;
+    }
+
+    private async void DeviceCard_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop) || (sender as FrameworkElement)?.DataContext is not DeviceItemViewModel target) return;
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) await _viewModel.HandleDroppedFilesAsync(files, target);
+        e.Handled = true;
     }
 
     private void MultiViewTile_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

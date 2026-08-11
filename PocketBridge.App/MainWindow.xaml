@@ -61,7 +61,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="14" Background="Transparent" CornerRadius="12" ClipToBounds="True">
+                                <Border Padding="14" Background="Transparent" CornerRadius="12" ClipToBounds="True" AllowDrop="True" Drop="DeviceCard_Drop">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                         <Border Width="34" Height="48" CornerRadius="7" BorderBrush="{StaticResource TextMutedBrush}" BorderThickness="2" VerticalAlignment="Top"><Ellipse Width="4" Height="4" Fill="{StaticResource TextMutedBrush}" VerticalAlignment="Top" Margin="0,4,0,0" /></Border>
@@ -124,6 +124,7 @@
                                     <Button Grid.Column="0" Style="{StaticResource BaseButton}" MinHeight="34" Padding="7,4" FontSize="10" Command="{Binding SendClipboardCommand}" Content="{loc:Loc SendClipboard}" ToolTip="{loc:Loc SendClipboardHelp}" />
                                     <Button Grid.Column="2" Style="{StaticResource BaseButton}" MinHeight="34" Padding="7,4" FontSize="10" Command="{Binding CopyDeviceClipboardCommand}" Content="{loc:Loc CopyDeviceClipboard}" />
                                 </Grid>
+                                <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="7,4" FontSize="10" Margin="0,8,0,0" Command="{Binding OpenTransfersCommand}" Content="{loc:Loc Transfers}" />
                             </StackPanel>
                         </Border>
                             <Border Grid.Column="2" Background="#0C111B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="12">
