@@ -93,7 +93,6 @@ Acceptance: validated options generate correct external arguments and embedded s
 - Group actions with prominent target count and opt-in broadcast.
 - Rotation/orientation controls and multiple Android displays.
 - Transfer history and richer cancellation/retry.
-- ADB console with visible fixed target and bounded history.
 - Configurable shortcuts UI.
 - App icons if retrieval can be bounded and cached safely.
 - Audio controls and recording mux options after capability work.
@@ -116,6 +115,23 @@ Implemented on `next` in this stage:
 
 Remaining P0/P1 work continues in later logical commits. Features requiring device capabilities are not considered hardware-accepted until the manual matrix below is executed.
 
+## Current implementation status
+
+The following source-level P1 work is complete on `next`:
+
+- bidirectional clipboard sync with Off/Manual/Automatic modes and feedback-loop prevention;
+- background drag-and-drop transfer queue with progress, cancel, retry and clear-completed;
+- Application Manager with user/system search, package metadata, launch, stop, uninstall, update, details and confirmed data clearing;
+- serial-scoped recording through the official scrcpy recorder in no-playback mode, with REC timer and configurable MP4/MKV destination;
+- expanded screenshots with configurable folder/name format, Windows-safe filenames, `Ctrl+Shift+S`, open/copy/Explorer actions;
+- embedded fullscreen with F11/Ctrl+Shift+F, Esc restore and a fading overlay;
+- Device Information including battery, storage and uptime, with serial/IP hidden by default when copied;
+- Advanced ADB Console with a fixed visible target, automatic `adb -s SERIAL` scoping, history, timestamps, streamed output and cancellation.
+
+The recording implementation deliberately uses a separate official scrcpy process: the embedded renderer currently exposes decoded H.264 frames and has no container muxer. This avoids adding a second codec stack or an unbounded re-encode queue, but requires hardware validation of graceful file finalization.
+
+P1 is complete in source. Hardware acceptance is still open. Remaining P2 is explicit Multi View group actions, configurable key mappings/shortcut UI, app-icon caching, richer transfer history, and audio/recording capability controls. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model.
+
 ## Verification matrix
 
 | Gate | Automated/local | Hardware/manual |
@@ -125,5 +141,10 @@ Remaining P0/P1 work continues in later logical commits. Features requiring devi
 | Multi-session retention | Unit checks | Two-device simultaneous display/control |
 | Latest-frame-wins | Existing bounded handoff plus regression checks | Observe latency/CPU/memory with 1/2/4 sessions |
 | APK and files | Serial-scoping checks | Drop APK/file with two connected devices |
+| Clipboard | Protocol and feedback-loop checks | Verify isolation with two connected devices |
+| Applications | Parser and serial-scoping checks | Exercise actions on a disposable user app |
+| Recording/screenshots | Release build and service wiring | Verify playable MP4/MKV and disconnect behavior |
+| Fullscreen | XAML and Release build | Verify F11/Esc/overlay and aspect ratio |
+| Device info/ADB console | Parser and quoted-argument checks | Compare values and cancel a long command |
 | Localization | Resource-key/build validation | Inspect RU/EN/zh-CN at supported window sizes |
 | Release | Locked restore, Release build, test executable | Clean runtime bootstrap and application smoke test |
