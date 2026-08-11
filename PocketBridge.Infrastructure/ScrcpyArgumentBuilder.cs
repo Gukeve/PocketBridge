@@ -20,6 +20,7 @@ public static class ScrcpyArgumentBuilder
         if (options.MaxFps is > 0) arguments.Add($"--max-fps={options.MaxFps}");
         if (!string.IsNullOrWhiteSpace(options.VideoBitRate)) arguments.Add($"--video-bit-rate={options.VideoBitRate}");
         arguments.Add($"--video-codec={options.VideoCodec.ToString().ToLowerInvariant()}");
+        if (options.ClipboardMode != ClipboardSyncMode.Automatic) arguments.Add("--no-clipboard-autosync");
         if (!options.AudioEnabled) arguments.Add("--no-audio");
         if (options.FullScreen) arguments.Add("--fullscreen");
         return arguments;

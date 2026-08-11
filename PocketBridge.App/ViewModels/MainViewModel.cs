@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using PocketBridge.App.Services;
 using PocketBridge.App.Localization;
 using PocketBridge.Core.Models;
@@ -23,6 +25,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
+    private readonly DispatcherTimer _clipboardTimer;
+    private readonly Dictionary<string, ClipboardSyncTracker> _clipboardTrackers = new(StringComparer.Ordinal);
+    private readonly HashSet<IEmbeddedDisplaySession> _clipboardSessions = new();
+    private long _clipboardSequence;
     private DeviceItemViewModel? _selectedDevice;
     private bool _isBusy;
     private bool _isMultiView;
@@ -79,6 +85,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         InstallApkCommand = new AsyncRelayCommand(InstallApkAsync, CanControl);
         WifiCommand = new AsyncRelayCommand(OpenWifiAsync, CanControl);
         ScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, CanControl);
+        SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
+        CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
+        _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
+        _clipboardTimer.Tick += ClipboardTimer_Tick;
+        _clipboardTimer.Start();
     }
 
     public ObservableCollection<DeviceItemViewModel> Devices { get; } = new();
@@ -103,6 +114,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand InstallApkCommand { get; }
     public AsyncRelayCommand WifiCommand { get; }
     public AsyncRelayCommand ScreenshotCommand { get; }
+    public AsyncRelayCommand SendClipboardCommand { get; }
+    public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
 
     public DeviceItemViewModel? SelectedDevice
     {
@@ -113,11 +126,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(HasSelection));
             OnPropertyChanged(nameof(ShowSelectionPrompt));
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
+            OnPropertyChanged(nameof(SelectedClipboardMode));
             OnPropertyChanged(nameof(ShowSingleDeviceContent));
             UpdateSelectionMessage();
             NotifyCommands();
         }
     }
+
+    public ClipboardSyncMode SelectedClipboardMode => SelectedDevice is null ? ClipboardSyncMode.Off : _profiles.Get(SelectedDevice.Serial).ClipboardMode;
 
     public int DeviceCount => Devices.Count;
     public string DeviceCountText => LocalizationService.Current.Format("DeviceCountFormat", DeviceCount);
@@ -352,6 +368,81 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task SendClipboardToDeviceAsync()
+    {
+        var session = SelectedEmbeddedSession;
+        if (session is null) return;
+        try
+        {
+            var text = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+            Tracker(session.Serial).ObserveWindows(text);
+            await session.SendClipboardAsync(text, Interlocked.Increment(ref _clipboardSequence), cancellationToken: _lifetime.Token);
+            SetStatus(LocalizationService.Current["StatusClipboardSent"], StatusKind.Success);
+        }
+        catch (Exception exception) { SetStatus(LocalizationService.Current.Format("StatusClipboardFailed", exception.Message), StatusKind.Error); }
+    }
+
+    private async Task CopyDeviceClipboardAsync()
+    {
+        var session = SelectedEmbeddedSession;
+        if (session is null) return;
+        try
+        {
+            await session.RequestClipboardAsync(_lifetime.Token);
+            SetStatus(LocalizationService.Current["StatusClipboardRequested"], StatusKind.Neutral);
+        }
+        catch (Exception exception) { SetStatus(LocalizationService.Current.Format("StatusClipboardFailed", exception.Message), StatusKind.Error); }
+    }
+
+    private async void ClipboardTimer_Tick(object? sender, EventArgs e)
+    {
+        var selected = SelectedDevice;
+        var session = SelectedEmbeddedSession;
+        if (selected is null || session is not { IsRunning: true } || _profiles.Get(selected.Serial).ClipboardMode != ClipboardSyncMode.Automatic) return;
+        try
+        {
+            var text = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+            var update = Tracker(selected.Serial).ObserveWindows(text);
+            if (update is not null) await session.SendClipboardAsync(text, update.Version, cancellationToken: _lifetime.Token);
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            SetStatus(LocalizationService.Current.Format("StatusClipboardFailed", exception.Message), StatusKind.Warning);
+        }
+    }
+
+    private void AttachClipboardHandlers()
+    {
+        foreach (var session in _embeddedSessions.Sessions)
+        {
+            if (!_clipboardSessions.Add(session)) continue;
+            session.ClipboardChanged += OnClipboardChanged;
+        }
+    }
+
+    private void OnClipboardChanged(object? sender, DeviceClipboardEventArgs e)
+    {
+        if (e.Sequence is not null || SelectedDevice?.Serial != e.Serial || _profiles.Get(e.Serial).ClipboardMode == ClipboardSyncMode.Off) return;
+        void Apply()
+        {
+            var update = Tracker(e.Serial).ObserveAndroid(e.Text);
+            if (update is null) return;
+            try
+            {
+                Clipboard.SetText(e.Text);
+                SetStatus(LocalizationService.Current["StatusClipboardReceived"], StatusKind.Success);
+            }
+            catch (Exception exception) { SetStatus(LocalizationService.Current.Format("StatusClipboardFailed", exception.Message), StatusKind.Warning); }
+        }
+        if (_uiContext is null) Apply(); else _uiContext.Post(_ => Apply(), null);
+    }
+
+    private ClipboardSyncTracker Tracker(string serial)
+    {
+        if (!_clipboardTrackers.TryGetValue(serial, out var tracker)) _clipboardTrackers.Add(serial, tracker = new ClipboardSyncTracker());
+        return tracker;
+    }
+
     private AsyncRelayCommand DeviceCommand(string successMessageKey, params string[] arguments) =>
         new(() => ExecuteDeviceCommandAsync(LocalizationService.Current[successMessageKey], arguments), CanControl);
 
@@ -385,6 +476,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (selected is null || !await _profileDialog.ShowAsync(selected.Device)) return;
         selected.Update(selected.Device, _profiles.Get(selected.Serial), selected.IsSessionRunning);
         OnPropertyChanged(nameof(SelectedDevice));
+        OnPropertyChanged(nameof(SelectedClipboardMode));
         SetStatus(LocalizationService.Current["StatusProfileSaved"], StatusKind.Success);
     }
 
@@ -496,6 +588,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         void Update()
         {
+            AttachClipboardHandlers();
             foreach (var item in Devices) item.IsSessionRunning = IsAnySessionRunning(item.Serial);
             if (SelectedEmbeddedSession is { IsRunning: false, UnavailableReason: { Length: > 0 } reason }) SetStatus(reason, StatusKind.Error);
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
@@ -534,12 +627,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool CanStop() => SelectedDevice is not null && _embeddedSessions.Get(SelectedDevice.Serial)?.IsRunning == true && !IsBusy;
     private bool CanRestart() => SelectedDevice?.Device.IsReady == true && _embeddedSessions.Get(SelectedDevice.Serial)?.IsRunning == true && !IsBusy;
     private bool CanControl() => SelectedDevice?.Device.IsReady == true && !IsBusy;
+    private bool CanUseClipboard() => SelectedEmbeddedSession is { IsRunning: true } && SelectedClipboardMode != ClipboardSyncMode.Off && !IsBusy;
     private bool CanStartMultiView() => Devices.Any(device => device.Device.IsReady) && !IsBusy;
 
     private void NotifyCommands()
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged();
     }
 
     private void SetStatus(string message, StatusKind kind)
@@ -556,6 +651,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         _scrcpy.SessionChanged -= OnSessionChanged;
         _embeddedSessions.SessionsChanged -= OnEmbeddedSessionsChanged;
+        _clipboardTimer.Stop();
+        _clipboardTimer.Tick -= ClipboardTimer_Tick;
+        foreach (var session in _clipboardSessions) session.ClipboardChanged -= OnClipboardChanged;
         _lifetime.Cancel();
         _embeddedSessions.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _lifetime.Dispose();

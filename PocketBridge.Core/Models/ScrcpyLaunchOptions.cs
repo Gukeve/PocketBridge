@@ -10,6 +10,7 @@ public sealed record ScrcpyLaunchOptions
     public int? MaxFps { get; init; }
     public string? VideoBitRate { get; init; }
     public PreferredVideoCodec VideoCodec { get; init; } = PreferredVideoCodec.H264;
+    public ClipboardSyncMode ClipboardMode { get; init; } = ClipboardSyncMode.Manual;
     public bool AudioEnabled { get; init; } = true;
     public bool FullScreen { get; init; }
 }

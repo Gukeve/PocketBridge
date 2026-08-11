@@ -14,6 +14,13 @@ public enum PreferredVideoCodec
     Av1
 }
 
+public enum ClipboardSyncMode
+{
+    Off,
+    Manual,
+    Automatic
+}
+
 public sealed record DeviceProfile
 {
     public required string Serial { get; init; }
@@ -28,7 +35,7 @@ public sealed record DeviceProfile
     public bool StayAwake { get; init; } = true;
     public bool AlwaysOnTop { get; init; }
     public bool AudioEnabled { get; init; } = true;
-    public bool AutomaticClipboardSync { get; init; }
+    public ClipboardSyncMode ClipboardMode { get; init; } = ClipboardSyncMode.Manual;
     public DateTimeOffset? LastConnected { get; init; }
 
     public string DisplayName(string fallback) => string.IsNullOrWhiteSpace(FriendlyName) ? fallback : FriendlyName.Trim();
@@ -42,6 +49,7 @@ public sealed record DeviceProfile
         MaxFps = PreferredFps,
         VideoBitRate = PreferredBitrateMbps is > 0 ? $"{PreferredBitrateMbps}M" : null,
         VideoCodec = PreferredCodec,
+        ClipboardMode = ClipboardMode,
         AudioEnabled = AudioEnabled
     };
 }

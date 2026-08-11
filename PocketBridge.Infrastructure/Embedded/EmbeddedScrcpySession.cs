@@ -5,6 +5,7 @@
 
 using System.Buffers.Binary;
 using System.Buffers;
+using System.Text;
 using PocketBridge.Core.Models;
 using PocketBridge.Core.Services;
 
@@ -21,6 +22,7 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
     private CancellationTokenSource? _lifetime;
     private ScrcpyTransport? _transport;
     private Task? _videoTask;
+    private Task? _controlTask;
     private string? _failureReason;
     private long _frameSequence;
 
@@ -35,6 +37,7 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
 
     public event EventHandler<VideoFrameEventArgs>? FrameReady;
     public event EventHandler? StateChanged;
+    public event EventHandler<DeviceClipboardEventArgs>? ClipboardChanged;
     public string Serial => _device.Serial;
     public DeviceDisplayMode Mode => DeviceDisplayMode.Embedded;
     public bool IsAvailable => true;
@@ -58,11 +61,50 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
             IsRunning = true;
             StateChanged?.Invoke(this, EventArgs.Empty);
             _videoTask = Task.Run(() => ReadVideoAsync(_transport, _lifetime.Token), CancellationToken.None);
+            _controlTask = Task.Run(() => ReadControlAsync(_transport, _lifetime.Token), CancellationToken.None);
         }
         catch
         {
             await StopAsync(CancellationToken.None).ConfigureAwait(false);
             throw;
+        }
+    }
+
+    private async Task ReadControlAsync(ScrcpyTransport transport, CancellationToken cancellationToken)
+    {
+        var type = new byte[1];
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await ScrcpyTransport.ReadExactlyAsync(transport.ControlStream, type, cancellationToken).ConfigureAwait(false);
+                switch (type[0])
+                {
+                    case 0:
+                        var lengthBuffer = new byte[4];
+                        await ScrcpyTransport.ReadExactlyAsync(transport.ControlStream, lengthBuffer, cancellationToken).ConfigureAwait(false);
+                        var length = checked((int)BinaryPrimitives.ReadUInt32BigEndian(lengthBuffer));
+                        if (length > 262_139) throw new InvalidDataException($"Invalid clipboard payload length {length}.");
+                        var textBuffer = new byte[length];
+                        await ScrcpyTransport.ReadExactlyAsync(transport.ControlStream, textBuffer, cancellationToken).ConfigureAwait(false);
+                        ClipboardChanged?.Invoke(this, new DeviceClipboardEventArgs(Serial, Encoding.UTF8.GetString(textBuffer)));
+                        break;
+                    case 1:
+                        var sequenceBuffer = new byte[8];
+                        await ScrcpyTransport.ReadExactlyAsync(transport.ControlStream, sequenceBuffer, cancellationToken).ConfigureAwait(false);
+                        ClipboardChanged?.Invoke(this, new DeviceClipboardEventArgs(Serial, string.Empty, unchecked((long)BinaryPrimitives.ReadUInt64BigEndian(sequenceBuffer))));
+                        break;
+                    default:
+                        throw new InvalidDataException($"Unsupported scrcpy device message type {type[0]}.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (EndOfStreamException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            _failureReason = $"Control receiver failed: {exception.Message}";
+            StateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -165,6 +207,8 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
         WriteControlAsync(ScrcpyProtocolV41.Scroll(x, y, VideoWidth, VideoHeight, horizontal, vertical, buttons), cancellationToken);
 
     public Task SendTextAsync(string text, CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.Text(text), cancellationToken);
+    public Task RequestClipboardAsync(CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.GetClipboard(), cancellationToken);
+    public Task SendClipboardAsync(string text, long sequence, bool paste = false, CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.SetClipboard(text, sequence, paste), cancellationToken);
 
     private async Task WriteControlAsync(byte[] message, CancellationToken cancellationToken)
     {
@@ -191,6 +235,11 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
             try { await videoTask.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false); } catch (OperationCanceledException) { } catch (TimeoutException) { }
         }
         _videoTask = null;
+        if (_controlTask is { } controlTask && Task.CurrentId != controlTask.Id)
+        {
+            try { await controlTask.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false); } catch (OperationCanceledException) { } catch (TimeoutException) { }
+        }
+        _controlTask = null;
         lifetime?.Dispose();
         IsRunning = false;
         StateChanged?.Invoke(this, EventArgs.Empty);

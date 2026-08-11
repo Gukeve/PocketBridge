@@ -94,7 +94,9 @@ internal sealed class ScrcpyTransport : IAsyncDisposable
             "com.genymobile.scrcpy.Server", ScrcpyProtocolV41.Version, $"scid={scid:x8}", "tunnel_forward=true",
             "audio=false", "control=true", "video=true", "video_codec=h264",
             "send_device_meta=true", "send_stream_meta=true", "send_frame_meta=true",
-            $"stay_awake={_options.StayAwake.ToString().ToLowerInvariant()}", "power_off_on_close=false"
+            $"stay_awake={_options.StayAwake.ToString().ToLowerInvariant()}",
+            $"clipboard_autosync={(_options.ClipboardMode == ClipboardSyncMode.Automatic).ToString().ToLowerInvariant()}",
+            "power_off_on_close=false"
         };
         if (_options.MaxSize is > 0) serverArguments.Add($"max_size={_options.MaxSize}");
         if (_options.MaxFps is > 0) serverArguments.Add($"max_fps={_options.MaxFps}");

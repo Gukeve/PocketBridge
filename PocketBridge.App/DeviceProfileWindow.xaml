@@ -36,6 +36,9 @@
                     <CheckBox x:Name="ScreenOffBox" Content="{loc:Loc ScreenOffOnConnect}" Margin="0,5" />
                     <CheckBox x:Name="AlwaysOnTopBox" Content="{loc:Loc AlwaysOnTop}" Margin="0,5" />
                     <CheckBox x:Name="AudioBox" Content="{loc:Loc AudioEnabled}" Margin="0,5" />
+                    <TextBlock Text="{loc:Loc ClipboardSync}" FontWeight="SemiBold" Margin="0,18,0,7" />
+                    <ComboBox x:Name="ClipboardModeBox" MinHeight="42" Padding="10,6" />
+                    <TextBlock Text="{loc:Loc ClipboardSyncHelp}" Margin="0,7,0,0" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">

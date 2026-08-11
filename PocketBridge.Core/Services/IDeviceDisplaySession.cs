@@ -23,6 +23,7 @@ public interface IEmbeddedDisplaySession : IDeviceDisplaySession, IAsyncDisposab
 {
     event EventHandler<VideoFrameEventArgs>? FrameReady;
     event EventHandler? StateChanged;
+    event EventHandler<DeviceClipboardEventArgs>? ClipboardChanged;
     int VideoWidth { get; }
     int VideoHeight { get; }
     string DeviceName { get; }
@@ -30,6 +31,15 @@ public interface IEmbeddedDisplaySession : IDeviceDisplaySession, IAsyncDisposab
     Task SendKeyAsync(AndroidKeyAction action, int keyCode, int repeat = 0, int metaState = 0, CancellationToken cancellationToken = default);
     Task SendScrollAsync(int x, int y, float horizontal, float vertical, uint buttons = 0, CancellationToken cancellationToken = default);
     Task SendTextAsync(string text, CancellationToken cancellationToken = default);
+    Task RequestClipboardAsync(CancellationToken cancellationToken = default);
+    Task SendClipboardAsync(string text, long sequence, bool paste = false, CancellationToken cancellationToken = default);
+}
+
+public sealed class DeviceClipboardEventArgs(string serial, string text, long? sequence = null) : EventArgs
+{
+    public string Serial { get; } = serial;
+    public string Text { get; } = text;
+    public long? Sequence { get; } = sequence;
 }
 
 public interface IEmbeddedSessionManager : IAsyncDisposable

@@ -20,7 +20,9 @@ var tests = new (string Name, Action Run)[]
     ("Keeps embedded sessions alive when switching devices", KeepsEmbeddedSessionsAlive),
     ("Persists independent device profiles", PersistsIndependentDeviceProfiles),
     ("Builds profile quality arguments", BuildsProfileQualityArguments),
-    ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint)
+    ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint),
+    ("Serializes clipboard protocol messages", SerializesClipboardMessages),
+    ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops)
 };
 
 var failed = 0;
@@ -253,6 +255,29 @@ static void PairsWirelessDebuggingEndpoint()
     True(adb.LastArguments.SequenceEqual(new[] { "pair", "192.0.2.20:37123", "123456" }), "Pairing was not scoped to the explicit endpoint.");
 }
 
+static void SerializesClipboardMessages()
+{
+    var get = ScrcpyProtocolV41.GetClipboard();
+    True(get.SequenceEqual(new byte[] { 8, 0 }), "Unexpected get-clipboard message.");
+    var set = ScrcpyProtocolV41.SetClipboard("hello", 42, false);
+    Equal((byte)9, set[0]);
+    Equal((ulong)42, BinaryPrimitives.ReadUInt64BigEndian(set.AsSpan(1, 8)));
+    Equal((byte)0, set[9]);
+    Equal((uint)5, BinaryPrimitives.ReadUInt32BigEndian(set.AsSpan(10, 4)));
+    Equal("hello", System.Text.Encoding.UTF8.GetString(set.AsSpan(14)));
+}
+
+static void PreventsClipboardFeedbackLoops()
+{
+    var tracker = new ClipboardSyncTracker();
+    var windows = tracker.ObserveWindows("alpha");
+    True(windows is { Source: ClipboardUpdateSource.Windows, Version: 1 }, "First Windows update was not forwarded.");
+    True(tracker.ObserveAndroid("alpha") is null, "Android echo created a feedback loop.");
+    var android = tracker.ObserveAndroid("beta");
+    True(android is { Source: ClipboardUpdateSource.Android, Version: 2 }, "New Android update was not accepted.");
+    True(tracker.ObserveWindows("beta") is null, "Windows echo created a feedback loop.");
+}
+
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException($"Expected '{expected}', got '{actual}'.");
@@ -287,6 +312,7 @@ sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
 {
     public event EventHandler<VideoFrameEventArgs>? FrameReady { add { } remove { } }
     public event EventHandler? StateChanged;
+    public event EventHandler<DeviceClipboardEventArgs>? ClipboardChanged { add { } remove { } }
     public string Serial { get; } = serial;
     public DeviceDisplayMode Mode => DeviceDisplayMode.Embedded;
     public bool IsAvailable => true;
@@ -301,5 +327,7 @@ sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
     public Task SendKeyAsync(AndroidKeyAction action, int keyCode, int repeat = 0, int metaState = 0, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendScrollAsync(int x, int y, float horizontal, float vertical, uint buttons = 0, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendTextAsync(string text, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task RequestClipboardAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendClipboardAsync(string text, long sequence, bool paste = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public async ValueTask DisposeAsync() => await StopAsync();
 }

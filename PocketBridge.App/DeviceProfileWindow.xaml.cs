@@ -35,6 +35,15 @@ public partial class DeviceProfileWindow : Window
         ScreenOffBox.IsChecked = profile.ScreenOffOnConnect;
         AlwaysOnTopBox.IsChecked = profile.AlwaysOnTop;
         AudioBox.IsChecked = profile.AudioEnabled;
+        ClipboardModeBox.ItemsSource = new[]
+        {
+            new ClipboardOption(ClipboardSyncMode.Off, LocalizationService.Current["ClipboardOff"]),
+            new ClipboardOption(ClipboardSyncMode.Manual, LocalizationService.Current["ClipboardManual"]),
+            new ClipboardOption(ClipboardSyncMode.Automatic, LocalizationService.Current["ClipboardAutomatic"])
+        };
+        ClipboardModeBox.SelectedValuePath = nameof(ClipboardOption.Value);
+        ClipboardModeBox.DisplayMemberPath = nameof(ClipboardOption.Label);
+        ClipboardModeBox.SelectedValue = profile.ClipboardMode;
     }
 
     public DeviceProfile? Result { get; private set; }
@@ -60,7 +69,8 @@ public partial class DeviceProfileWindow : Window
             StayAwake = StayAwakeBox.IsChecked == true,
             ScreenOffOnConnect = ScreenOffBox.IsChecked == true,
             AlwaysOnTop = AlwaysOnTopBox.IsChecked == true,
-            AudioEnabled = AudioBox.IsChecked == true
+            AudioEnabled = AudioBox.IsChecked == true,
+            ClipboardMode = ClipboardModeBox.SelectedValue is ClipboardSyncMode clipboardMode ? clipboardMode : ClipboardSyncMode.Manual
         };
         DialogResult = true;
     }
@@ -75,4 +85,5 @@ public partial class DeviceProfileWindow : Window
     }
 
     private sealed record ConnectionOption(PreferredDeviceConnection Value, string Label);
+    private sealed record ClipboardOption(ClipboardSyncMode Value, string Label);
 }

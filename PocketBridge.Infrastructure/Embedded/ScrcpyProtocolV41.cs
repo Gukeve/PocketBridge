@@ -71,6 +71,21 @@ internal static class ScrcpyProtocolV41
         return data;
     }
 
+    public static byte[] GetClipboard() => new byte[] { 8, 0 };
+
+    public static byte[] SetClipboard(string text, long sequence, bool paste)
+    {
+        var utf8 = Encoding.UTF8.GetBytes(text);
+        if (utf8.Length > 262_130) Array.Resize(ref utf8, 262_130);
+        var data = new byte[14 + utf8.Length];
+        data[0] = 9;
+        BinaryPrimitives.WriteUInt64BigEndian(data.AsSpan(1), unchecked((ulong)sequence));
+        data[9] = paste ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(10), (uint)utf8.Length);
+        utf8.CopyTo(data, 14);
+        return data;
+    }
+
     private static ushort ToFixedPoint16(float value) => value >= 1 ? ushort.MaxValue : value <= 0 ? (ushort)0 : (ushort)(value * 65536f);
     private static ushort ToSignedFixedPoint16(float value) => unchecked((ushort)(short)Math.Clamp((int)(value / 16f * 32768f), short.MinValue, short.MaxValue));
 }
