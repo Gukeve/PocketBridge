@@ -29,6 +29,10 @@ public partial class SettingsWindow : Window
         LanguageBox.DisplayMemberPath = nameof(LanguageOption.Name);
         LanguageBox.SelectedValue = _initialLanguage;
         ToolsDirectoryBox.Text = runtimeTools.DefaultToolsDirectory;
+        RecordingFolderBox.Text = settings.RecordingFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+        ScreenshotFolderBox.Text = settings.ScreenshotFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        ScreenshotFormatBox.Text = settings.ScreenshotFilenameFormat;
+        RecordingFormatBox.SelectedIndex = settings.RecordingFormat.Equals("mkv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         VersionText.Text = LocalizationService.Current.Format("VersionFormat", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0");
         UpdateComponentStatus();
     }
@@ -56,8 +60,12 @@ public partial class SettingsWindow : Window
     private static void SetComponent(TextBlock target, bool found, string name) { target.Text = $"{(found ? "✓" : "—")} {name}"; target.Foreground = found ? Brush(88, 214, 168) : Brush(170, 180, 197); }
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage }; DialogResult = true;
+        var format = (RecordingFormatBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "mp4";
+        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage, RecordingFolder = RecordingFolderBox.Text.Trim(), RecordingFormat = format, ScreenshotFolder = ScreenshotFolderBox.Text.Trim(), ScreenshotFilenameFormat = ScreenshotFormatBox.Text.Trim() }; DialogResult = true;
     }
+    private void BrowseRecording_Click(object sender, RoutedEventArgs e) => BrowseFolder(RecordingFolderBox);
+    private void BrowseScreenshot_Click(object sender, RoutedEventArgs e) => BrowseFolder(ScreenshotFolderBox);
+    private void BrowseFolder(TextBox target) { var picker = new Microsoft.Win32.OpenFolderDialog { InitialDirectory = target.Text }; if (picker.ShowDialog(this) == true) target.Text = picker.FolderName; }
     private static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     private void OpenScrcpy_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/Genymobile/scrcpy");
     private void OpenLicense_Click(object sender, RoutedEventArgs e)

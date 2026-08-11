@@ -9,6 +9,7 @@
     <Window.InputBindings>
         <KeyBinding Key="F5" Command="{Binding RefreshCommand}" />
         <KeyBinding Key="Enter" Modifiers="Control" Command="{Binding ConnectCommand}" />
+        <KeyBinding Key="S" Modifiers="Control+Shift" Command="{Binding ScreenshotCommand}" />
     </Window.InputBindings>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="100" /><RowDefinition Height="*" /><RowDefinition Height="54" /></Grid.RowDefinitions>
@@ -119,6 +120,7 @@
                                     <Button Style="{StaticResource DangerButton}" MinHeight="34" Padding="4" FontFamily="Segoe Fluent Icons" FontSize="15" Command="{Binding RebootCommand}" Content="&#xE777;" ToolTip="{loc:Loc RestartAndroid}" AutomationProperties.Name="{loc:Loc RestartAndroid}" Margin="0,0,5,0" />
                                     <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="4" FontFamily="Segoe Fluent Icons" FontSize="15" Command="{Binding OpenExternalCommand}" Content="&#xE8A7;" ToolTip="{loc:Loc OpenExternal}" AutomationProperties.Name="{loc:Loc OpenExternal}" />
                                 </UniformGrid>
+                                <Button Style="{StaticResource BaseButton}" MinHeight="34" Margin="0,8,0,0" Command="{Binding ToggleRecordingCommand}" Content="{Binding RecordingText}" />
                                 <TextBlock Text="{loc:Loc Clipboard}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,6" />
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                                     <Button Grid.Column="0" Style="{StaticResource BaseButton}" MinHeight="34" Padding="7,4" FontSize="10" Command="{Binding SendClipboardCommand}" Content="{loc:Loc SendClipboard}" ToolTip="{loc:Loc SendClipboardHelp}" />

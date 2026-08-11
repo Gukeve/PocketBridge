@@ -12,6 +12,7 @@ namespace PocketBridge.App;
 public partial class App : Application
 {
     private IFileTransferQueueService? _transfers;
+    private IRecordingService? _recordings;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -24,6 +25,8 @@ public partial class App : Application
         IFileTransferQueueService transfers = new FileTransferQueueService(new AdbTransferExecutor(locator, settings));
         _transfers = transfers;
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
+        IRecordingService recordings = new RecordingService(locator, settings);
+        _recordings = recordings;
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
         IUpdateCheckService updates = new UpdateCheckService(locator, settings, runtimeTools, Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0");
@@ -36,8 +39,9 @@ public partial class App : Application
             confirmation,
             profiles,
             transfers,
-            new ApplicationService(adb));
-        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs);
+            new ApplicationService(adb),
+            settings);
+        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings);
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();
@@ -47,6 +51,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _transfers?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        _recordings?.Dispose();
         base.OnExit(e);
     }
 }

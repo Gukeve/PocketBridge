@@ -16,6 +16,7 @@ public interface IFeatureDialogService
     Task<int> QueueDroppedFilesAsync(AndroidDevice device, IReadOnlyList<string> files);
     void ShowTransfers();
     void ShowApplications(AndroidDevice device);
+    void ShowMediaResult(string filePath, bool canCopy);
 }
 
 public sealed class FeatureDialogService : IFeatureDialogService
@@ -28,11 +29,12 @@ public sealed class FeatureDialogService : IFeatureDialogService
     private readonly IDeviceProfileService _profiles;
     private readonly IFileTransferQueueService _transfers;
     private readonly IApplicationService _applications;
+    private readonly IAppSettingsService _settings;
     private TransferQueueWindow? _transferWindow;
 
-    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications)
+    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications, IAppSettingsService settings)
     {
-        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications;
+        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications; _settings = settings;
     }
 
     public async Task<string?> InstallApkAsync(AndroidDevice device, string? apkPath = null)
@@ -54,10 +56,16 @@ public sealed class FeatureDialogService : IFeatureDialogService
 
     public async Task<string?> CaptureScreenshotAsync(AndroidDevice device)
     {
-        var picker = new SaveFileDialog { Title = LocalizationService.Current["ChooseScreenshot"], Filter = "PNG image (*.png)|*.png", FileName = $"{device.FriendlyName}_{DateTime.Now:yyyyMMdd_HHmmss}.png" };
-        if (picker.ShowDialog() != true) return null;
-        await _screenshots.CaptureAsync(device.Serial, picker.FileName);
-        return LocalizationService.Current.Format("ScreenshotSaved", picker.FileName);
+        var settings = _settings.Load();
+        var folder = string.IsNullOrWhiteSpace(settings.ScreenshotFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) : settings.ScreenshotFolder;
+        Directory.CreateDirectory(folder!);
+        var deviceName = SanitizeFilename(device.FriendlyName);
+        var template = string.IsNullOrWhiteSpace(settings.ScreenshotFilenameFormat) ? "PocketBridge_<device>_yyyy-MM-dd_HH-mm-ss" : settings.ScreenshotFilenameFormat;
+        var name = SanitizeFilename(DateTime.Now.ToString(template.Replace("<device>", deviceName, StringComparison.OrdinalIgnoreCase), System.Globalization.CultureInfo.InvariantCulture));
+        var path = Path.Combine(folder!, name + ".png");
+        await _screenshots.CaptureAsync(device.Serial, path);
+        ShowMediaResult(path, true);
+        return LocalizationService.Current.Format("ScreenshotSaved", path);
     }
 
     public Task<int> QueueDroppedFilesAsync(AndroidDevice device, IReadOnlyList<string> files)
@@ -92,6 +100,7 @@ public sealed class FeatureDialogService : IFeatureDialogService
     }
 
     public void ShowApplications(AndroidDevice device) => new ApplicationManagerWindow(device, _applications, _apkInstaller, _confirmation) { Owner = Application.Current.MainWindow }.Show();
+    public void ShowMediaResult(string filePath, bool canCopy) => new MediaResultWindow(filePath, canCopy) { Owner = Application.Current.MainWindow }.Show();
 
     private static string NormalizeDestination(string value)
     {
@@ -100,4 +109,5 @@ public sealed class FeatureDialogService : IFeatureDialogService
         if (normalized.Split('/').Any(segment => segment == "..")) throw new InvalidOperationException(LocalizationService.Current["InvalidTransferDestination"]);
         return normalized.TrimEnd('/') + "/";
     }
+    private static string SanitizeFilename(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -22,10 +23,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IDeviceProfileDialogService _profileDialog;
     private readonly IConfirmationService _confirmation;
     private readonly IFeatureDialogService _featureDialogs;
+    private readonly IRecordingService _recordings;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
     private readonly DispatcherTimer _clipboardTimer;
+    private readonly DispatcherTimer _recordingTimer;
     private readonly Dictionary<string, ClipboardSyncTracker> _clipboardTrackers = new(StringComparer.Ordinal);
     private readonly HashSet<IEmbeddedDisplaySession> _clipboardSessions = new();
     private long _clipboardSequence;
@@ -47,7 +50,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ISettingsDialogService settingsDialog,
         IDeviceProfileDialogService profileDialog,
         IConfirmationService confirmation,
-        IFeatureDialogService featureDialogs)
+        IFeatureDialogService featureDialogs,
+        IRecordingService recordings)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -60,6 +64,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _profileDialog = profileDialog;
         _confirmation = confirmation;
         _featureDialogs = featureDialogs;
+        _recordings = recordings;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
@@ -87,11 +92,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, CanControl);
         OpenTransfersCommand = new RelayCommand(_featureDialogs.ShowTransfers);
         OpenApplicationsCommand = new RelayCommand(OpenApplications, CanControl);
+        ToggleRecordingCommand = new AsyncRelayCommand(ToggleRecordingAsync, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
         _clipboardTimer.Tick += ClipboardTimer_Tick;
         _clipboardTimer.Start();
+        _recordingTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
+        _recordingTimer.Tick += (_, _) => OnPropertyChanged(nameof(RecordingText));
+        _recordingTimer.Start();
+        _recordings.Changed += OnRecordingChanged;
     }
 
     public ObservableCollection<DeviceItemViewModel> Devices { get; } = new();
@@ -118,6 +128,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand ScreenshotCommand { get; }
     public RelayCommand OpenTransfersCommand { get; }
     public RelayCommand OpenApplicationsCommand { get; }
+    public AsyncRelayCommand ToggleRecordingCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
 
@@ -175,6 +186,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _ => Brush(170, 180, 197)
     };
     public string SessionSummary => LocalizationService.Current.Format("ActiveSessionsFormat", _embeddedSessions.Sessions.Count(session => session.IsRunning) + _scrcpy.GetActiveSessions().Count);
+    public bool IsRecording => SelectedDevice is not null && _recordings.Get(SelectedDevice.Serial)?.IsRunning == true;
+    public string RecordingText => IsRecording
+        ? $"● REC {(DateTimeOffset.Now - _recordings.Get(SelectedDevice!.Serial)!.StartedAt):hh\\:mm\\:ss}"
+        : LocalizationService.Current["Record"];
 
     public async Task InitializeAsync()
     {
@@ -387,6 +402,38 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             SetStatus(LocalizationService.Current.Format("ScreenshotFailed", exception.Message), StatusKind.Error);
         }
     }
+
+    private async Task ToggleRecordingAsync()
+    {
+        var selected = SelectedDevice;
+        if (selected is null) return;
+        try
+        {
+            if (_recordings.Get(selected.Serial)?.IsRunning == true)
+            {
+                var stopped = await _recordings.StopAsync(selected.Serial);
+                if (stopped is not null) _featureDialogs.ShowMediaResult(stopped.FilePath, false);
+            }
+            else
+            {
+                var settings = _settings.Load();
+                var format = settings.RecordingFormat.Equals("mkv", StringComparison.OrdinalIgnoreCase) ? "mkv" : "mp4";
+                var folder = string.IsNullOrWhiteSpace(settings.RecordingFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) : settings.RecordingFolder;
+                var safeDevice = SanitizeFilename(selected.FriendlyName);
+                var path = Path.Combine(folder!, $"PocketBridge_{safeDevice}_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.{format}");
+                await _recordings.StartAsync(selected.Device, path);
+            }
+        }
+        catch (Exception exception) { SetStatus(LocalizationService.Current.Format("RecordingFailed", exception.Message), StatusKind.Error); }
+    }
+
+    private void OnRecordingChanged(object? sender, RecordingSession session)
+    {
+        void Update() { OnPropertyChanged(nameof(IsRecording)); OnPropertyChanged(nameof(RecordingText)); ToggleRecordingCommand.NotifyCanExecuteChanged(); }
+        if (_uiContext is null) Update(); else _uiContext.Post(_ => Update(), null);
+    }
+
+    private static string SanitizeFilename(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
 
     private async Task SendClipboardToDeviceAsync()
     {
@@ -654,7 +701,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged();
     }
 
     private void SetStatus(string message, StatusKind kind)
@@ -672,6 +719,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _scrcpy.SessionChanged -= OnSessionChanged;
         _embeddedSessions.SessionsChanged -= OnEmbeddedSessionsChanged;
         _clipboardTimer.Stop();
+        _recordingTimer.Stop();
+        _recordings.Changed -= OnRecordingChanged;
         _clipboardTimer.Tick -= ClipboardTimer_Tick;
         foreach (var session in _clipboardSessions) session.ClipboardChanged -= OnClipboardChanged;
         _lifetime.Cancel();
