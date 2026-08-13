@@ -15,7 +15,7 @@ public enum FileTransferState
     Cancelled
 }
 
-public sealed record FileTransferRequest(string Source, string Destination, string Serial, FileTransferOperation Operation);
+public sealed record FileTransferRequest(string Source, string Destination, string Serial, FileTransferOperation Operation, string? DeviceAlias = null);
 
 public sealed record FileTransferSnapshot(
     Guid Id,
@@ -25,4 +25,9 @@ public sealed record FileTransferSnapshot(
     FileTransferOperation Operation,
     double Progress,
     FileTransferState State,
-    string? Error);
+    string? Error,
+    DateTimeOffset Timestamp,
+    string DeviceAlias,
+    long Bytes,
+    TimeSpan? Duration,
+    string Direction);

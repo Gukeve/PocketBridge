@@ -75,6 +75,15 @@ public sealed class FileTransferQueueService : IFileTransferQueueService
         return removed;
     }
 
+    public int ClearHistory()
+    {
+        var removed = 0;
+        foreach (var pair in _items.Where(pair => pair.Value.State is FileTransferState.Completed or FileTransferState.Failed or FileTransferState.Cancelled).ToArray())
+            if (_items.TryRemove(pair.Key, out _)) removed++;
+        if (removed > 0) Changed?.Invoke(this, EventArgs.Empty);
+        return removed;
+    }
+
     private async Task ProcessAsync()
     {
         while (!_lifetime.IsCancellationRequested)
@@ -86,6 +95,7 @@ public sealed class FileTransferQueueService : IFileTransferQueueService
             {
                 if (entry.State != FileTransferState.Waiting) continue;
                 entry.State = FileTransferState.Transferring;
+                entry.Started = DateTimeOffset.Now;
                 entry.Cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             }
             Changed?.Invoke(this, EventArgs.Empty);
@@ -100,22 +110,30 @@ public sealed class FileTransferQueueService : IFileTransferQueueService
                     entry.Progress = result.IsSuccess ? 1 : entry.Progress;
                     entry.State = result.IsSuccess ? FileTransferState.Completed : FileTransferState.Failed;
                     entry.Error = result.IsSuccess ? null : (string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput.Trim() : result.StandardError.Trim());
+                    entry.Completed = DateTimeOffset.Now;
                 }
             }
             catch (OperationCanceledException)
             {
-                lock (entry.Gate) { entry.State = FileTransferState.Cancelled; entry.Error = null; }
+                lock (entry.Gate) { entry.State = FileTransferState.Cancelled; entry.Error = null; entry.Completed = DateTimeOffset.Now; }
             }
             catch (Exception exception)
             {
-                lock (entry.Gate) { entry.State = FileTransferState.Failed; entry.Error = exception.Message; }
+                lock (entry.Gate) { entry.State = FileTransferState.Failed; entry.Error = exception.Message; entry.Completed = DateTimeOffset.Now; }
             }
             finally
             {
                 lock (entry.Gate) { entry.Cancellation?.Dispose(); entry.Cancellation = null; }
                 Changed?.Invoke(this, EventArgs.Empty);
+                TrimHistory();
             }
         }
+    }
+
+    private void TrimHistory()
+    {
+        foreach (var entry in _items.Values.Where(item => item.State is FileTransferState.Completed or FileTransferState.Failed or FileTransferState.Cancelled).OrderByDescending(item => item.Completed).Skip(500).ToArray())
+            _items.TryRemove(entry.Id, out _);
     }
 
     private static void Validate(FileTransferRequest request)
@@ -144,6 +162,17 @@ public sealed class FileTransferQueueService : IFileTransferQueueService
         public FileTransferState State { get; set; } = FileTransferState.Waiting;
         public string? Error { get; set; }
         public CancellationTokenSource? Cancellation { get; set; }
-        public FileTransferSnapshot Snapshot() { lock (Gate) return new(Id, Request.Source, Request.Destination, Request.Serial, Request.Operation, Progress, State, Error); }
+        public DateTimeOffset Created { get; } = DateTimeOffset.Now;
+        public DateTimeOffset? Started { get; set; }
+        public DateTimeOffset? Completed { get; set; }
+        public FileTransferSnapshot Snapshot()
+        {
+            lock (Gate)
+            {
+                var bytes = File.Exists(Request.Source) ? new FileInfo(Request.Source).Length : 0;
+                return new(Id, Request.Source, Request.Destination, Request.Serial, Request.Operation, Progress, State, Error, Created, Request.DeviceAlias ?? Redact(Request.Serial), bytes, Started is null ? null : (Completed ?? DateTimeOffset.Now) - Started, "PC → Android");
+            }
+        }
+        private static string Redact(string serial) => serial.Length <= 4 ? "••••" : $"••••{serial[^4..]}";
     }
 }

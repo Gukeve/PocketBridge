@@ -16,4 +16,5 @@ public interface IFileTransferQueueService : IAsyncDisposable
     void Cancel(Guid id);
     bool Retry(Guid id);
     int ClearCompleted();
+    int ClearHistory();
 }

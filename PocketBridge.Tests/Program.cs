@@ -296,7 +296,7 @@ static void ProcessesFileTransferQueue()
     var queue = new FileTransferQueueService(executor);
     try
     {
-        var id = queue.Enqueue(new[] { new FileTransferRequest(path, "/sdcard/Download/test.txt", "QUEUE-SERIAL", FileTransferOperation.Upload) }).Single();
+        var id = queue.Enqueue(new[] { new FileTransferRequest(path, "/sdcard/Download/test.txt", "QUEUE-SERIAL", FileTransferOperation.Upload, "Test phone") }).Single();
         var deadline = DateTime.UtcNow.AddSeconds(2);
         while (queue.Items.Single(item => item.Id == id).State is FileTransferState.Waiting or FileTransferState.Transferring && DateTime.UtcNow < deadline) Thread.Sleep(10);
         var completed = queue.Items.Single(item => item.Id == id);
@@ -304,6 +304,10 @@ static void ProcessesFileTransferQueue()
         Equal(1d, completed.Progress);
         Equal("QUEUE-SERIAL", executor.Serial);
         Equal("/sdcard/Download/test.txt", executor.Destination);
+        Equal("Test phone", completed.DeviceAlias);
+        Equal(4L, completed.Bytes);
+        True(completed.Duration is not null, "Completed transfer must include duration metadata.");
+        Equal("PC → Android", completed.Direction);
         Equal(1, queue.ClearCompleted());
     }
     finally

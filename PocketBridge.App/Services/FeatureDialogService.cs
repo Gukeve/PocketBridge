@@ -83,14 +83,14 @@ public sealed class FeatureDialogService : IFeatureDialogService
         var regular = existing.Except(apk, StringComparer.OrdinalIgnoreCase).ToArray();
         var requests = new List<FileTransferRequest>();
         if (apk.Length > 0 && _confirmation.Confirm(LocalizationService.Current["InstallApk"], LocalizationService.Current.Format("ConfirmInstallCount", apk.Length, device.FriendlyName)))
-            requests.AddRange(apk.Select(path => new FileTransferRequest(path, "package", device.Serial, FileTransferOperation.InstallApk)));
+            requests.AddRange(apk.Select(path => new FileTransferRequest(path, "package", device.Serial, FileTransferOperation.InstallApk, device.FriendlyName)));
         if (regular.Length > 0)
         {
             var prompt = new TextPromptWindow(LocalizationService.Current.Format("TransferFilesPrompt", regular.Length, device.FriendlyName), "/sdcard/Download/") { Owner = Application.Current.MainWindow };
             if (prompt.ShowDialog() == true)
             {
                 var destination = NormalizeDestination(prompt.Value);
-                requests.AddRange(regular.Select(path => new FileTransferRequest(path, $"{destination}{Path.GetFileName(path)}", device.Serial, FileTransferOperation.Upload)));
+                requests.AddRange(regular.Select(path => new FileTransferRequest(path, $"{destination}{Path.GetFileName(path)}", device.Serial, FileTransferOperation.Upload, device.FriendlyName)));
             }
         }
         var count = _transfers.Enqueue(requests).Count;
@@ -128,7 +128,7 @@ public sealed class FeatureDialogService : IFeatureDialogService
         var results = new List<GroupActionResult>();
         foreach (var device in devices)
         {
-            var requests = picker.FileNames.Select(path => new FileTransferRequest(path, $"{destination}{Path.GetFileName(path)}", device.Serial, FileTransferOperation.Upload));
+            var requests = picker.FileNames.Select(path => new FileTransferRequest(path, $"{destination}{Path.GetFileName(path)}", device.Serial, FileTransferOperation.Upload, device.FriendlyName));
             var count = _transfers.Enqueue(requests).Count;
             results.Add(new GroupActionResult(device.Serial, device.FriendlyName, count == picker.FileNames.Length, count == picker.FileNames.Length ? null : "Some files were not queued."));
         }
