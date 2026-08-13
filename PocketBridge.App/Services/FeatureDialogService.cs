@@ -35,14 +35,15 @@ public sealed class FeatureDialogService : IFeatureDialogService
     private readonly IDeviceProfileService _profiles;
     private readonly IFileTransferQueueService _transfers;
     private readonly IApplicationService _applications;
+    private readonly IApplicationIconService _applicationIcons;
     private readonly IAppSettingsService _settings;
     private readonly IDeviceInformationService _deviceInformation;
     private readonly IAdbConsoleService _adbConsole;
     private TransferQueueWindow? _transferWindow;
 
-    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications, IAppSettingsService settings, IDeviceInformationService deviceInformation, IAdbConsoleService adbConsole)
+    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications, IApplicationIconService applicationIcons, IAppSettingsService settings, IDeviceInformationService deviceInformation, IAdbConsoleService adbConsole)
     {
-        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications; _settings = settings; _deviceInformation = deviceInformation; _adbConsole = adbConsole;
+        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications; _applicationIcons = applicationIcons; _settings = settings; _deviceInformation = deviceInformation; _adbConsole = adbConsole;
     }
 
     public async Task<string?> InstallApkAsync(AndroidDevice device, string? apkPath = null)
@@ -163,7 +164,7 @@ public sealed class FeatureDialogService : IFeatureDialogService
         _transferWindow.Show();
     }
 
-    public void ShowApplications(AndroidDevice device) => new ApplicationManagerWindow(device, _applications, _apkInstaller, _confirmation) { Owner = Application.Current.MainWindow }.Show();
+    public void ShowApplications(AndroidDevice device) => new ApplicationManagerWindow(device, _applications, _applicationIcons, _apkInstaller, _confirmation) { Owner = Application.Current.MainWindow }.Show();
     public void ShowMediaResult(string filePath, bool canCopy) => new MediaResultWindow(filePath, canCopy) { Owner = Application.Current.MainWindow }.Show();
     public void ShowDeviceInformation(AndroidDevice device) => new DeviceInformationWindow(device, _deviceInformation) { Owner = Application.Current.MainWindow }.Show();
     public void ShowAdbConsole(AndroidDevice device) => new AdbConsoleWindow(device, _adbConsole) { Owner = Application.Current.MainWindow }.Show();

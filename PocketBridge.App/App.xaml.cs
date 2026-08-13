@@ -28,6 +28,8 @@ public partial class App : Application
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
         IRecordingService recordings = new RecordingService(locator, settings);
         IAudioForwardingService audio = new AudioForwardingService(adb, locator, settings);
+        IApplicationIconService applicationIcons = new ApplicationIconService(adb, new AppIconCache());
+        IDeviceMediaCapabilityService mediaCapabilities = new DeviceMediaCapabilityService(audio, locator, settings);
         _recordings = recordings;
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
@@ -41,11 +43,11 @@ public partial class App : Application
             confirmation,
             profiles,
             transfers,
-            new ApplicationService(adb),
+            new ApplicationService(adb), applicationIcons,
             settings,
             new DeviceInformationService(adb),
             new AdbConsoleService(locator, settings));
-        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb), audio);
+        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb), audio, mediaCapabilities);
         _audio = audio;
         var window = new MainWindow(viewModel);
         MainWindow = window;
