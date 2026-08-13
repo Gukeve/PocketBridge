@@ -27,6 +27,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IRecordingService _recordings;
     private readonly IGroupActionService _groupActions;
     private readonly IAudioForwardingService _audio;
+    private readonly IDeviceMediaCapabilityService _mediaCapabilityService;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
@@ -43,6 +44,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private StatusKind _statusKind = StatusKind.Neutral;
     private string _audioStatus = "Audio: not checked";
     private bool _audioSupported;
+    private DeviceMediaCapabilities? _mediaCapabilities;
 
     public MainViewModel(
         IAdbService adb,
@@ -58,7 +60,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IFeatureDialogService featureDialogs,
         IRecordingService recordings,
         IGroupActionService groupActions,
-        IAudioForwardingService audio)
+        IAudioForwardingService audio,
+        IDeviceMediaCapabilityService mediaCapabilityService)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -74,6 +77,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _recordings = recordings;
         _groupActions = groupActions;
         _audio = audio;
+        _mediaCapabilityService = mediaCapabilityService;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
@@ -263,9 +267,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private async Task RefreshAudioCapabilityAsync()
     {
         var selected = SelectedDevice;
-        if (selected is null) { _audioSupported = false; AudioStatus = LocalizationService.Current["AudioNotChecked"]; ToggleAudioCommand.NotifyCanExecuteChanged(); return; }
-        var capability = await _audio.DetectAsync(selected.Serial);
+        if (selected is null) { _audioSupported = false; _mediaCapabilities = null; AudioStatus = LocalizationService.Current["AudioNotChecked"]; ToggleAudioCommand.NotifyCanExecuteChanged(); return; }
+        var media = await _mediaCapabilityService.DetectAsync(selected.Serial);
+        var capability = media.Audio;
         if (SelectedDevice?.Serial != selected.Serial) return;
+        _mediaCapabilities = media;
         _audioSupported = capability.IsSupported;
         AudioStatus = capability.IsSupported ? LocalizationService.Current.Format("AudioSupported", capability.Codec, capability.AndroidApi) : LocalizationService.Current.Format("AudioUnsupported", capability.Reason ?? "unknown");
         ToggleAudioCommand.NotifyCanExecuteChanged();
@@ -507,7 +513,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 var folder = string.IsNullOrWhiteSpace(settings.RecordingFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) : settings.RecordingFolder;
                 var safeDevice = SanitizeFilename(selected.FriendlyName);
                 var path = Path.Combine(folder!, $"PocketBridge_{safeDevice}_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.{format}");
-                await _recordings.StartAsync(selected.Device, path, new RecordingOptions(format, settings.RecordingVideoCodec, settings.RecordingIncludeAudio, settings.RecordingMaxSize, settings.RecordingMaxFps, settings.RecordingBitrateMbps));
+                var options = new RecordingOptions(format, settings.RecordingVideoCodec, settings.RecordingIncludeAudio, settings.RecordingMaxSize, settings.RecordingMaxFps, settings.RecordingBitrateMbps);
+                var capabilities = _mediaCapabilities ?? await _mediaCapabilityService.DetectAsync(selected.Serial);
+                if (!capabilities.Supports(options, out var reason)) throw new NotSupportedException(reason);
+                await _recordings.StartAsync(selected.Device, path, options);
             }
         }
         catch (Exception exception) { SetStatus(LocalizationService.Current.Format("RecordingFailed", exception.Message), StatusKind.Error); }
@@ -639,7 +648,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private async Task OpenSettingsAsync()
     {
-        if (!await _settingsDialog.ShowAsync()) return;
+        if (!await _settingsDialog.ShowAsync(_mediaCapabilities)) return;
         SetStatus(LocalizationService.Current["StatusSettingsSaved"], StatusKind.Neutral);
         await RefreshDevicesAsync(true);
     }

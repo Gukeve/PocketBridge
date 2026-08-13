@@ -18,7 +18,7 @@ public partial class SettingsWindow : Window
     private readonly string _initialLanguage;
     private readonly AppSettings _initialSettings;
 
-    public SettingsWindow(AppSettings settings, IRuntimeToolsService runtimeTools, IUpdateCheckService updates)
+    public SettingsWindow(AppSettings settings, IRuntimeToolsService runtimeTools, IUpdateCheckService updates, DeviceMediaCapabilities? capabilities = null)
     {
         _runtimeTools = runtimeTools;
         _updates = updates;
@@ -36,8 +36,12 @@ public partial class SettingsWindow : Window
         ScreenshotFolderBox.Text = settings.ScreenshotFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
         ScreenshotFormatBox.Text = settings.ScreenshotFilenameFormat;
         RecordingFormatBox.SelectedIndex = settings.RecordingFormat.Equals("mkv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-        RecordingCodecBox.SelectedIndex = settings.RecordingVideoCodec switch { "h265" => 1, "av1" => 2, _ => 0 };
+        var availableCodecs = capabilities?.VideoCodecs.Count > 0 ? capabilities.VideoCodecs : new[] { "h264" };
+        RecordingCodecBox.ItemsSource = availableCodecs.Select(codec => new CodecOption(codec, codec switch { "h264" => "H.264", "h265" => "H.265", "av1" => "AV1", _ => codec })).ToArray();
+        RecordingCodecBox.DisplayMemberPath = nameof(CodecOption.Label); RecordingCodecBox.SelectedValuePath = nameof(CodecOption.Code); RecordingCodecBox.SelectedValue = availableCodecs.Contains(settings.RecordingVideoCodec) ? settings.RecordingVideoCodec : availableCodecs[0];
         RecordingAudioBox.IsChecked = settings.RecordingIncludeAudio;
+        RecordingAudioBox.IsEnabled = capabilities?.Audio.IsSupported == true;
+        RecordingAudioBox.ToolTip = capabilities is null ? LocalizationService.Current["SelectDeviceForCapabilities"] : capabilities.Audio.IsSupported ? LocalizationService.Current["AudioAvailable"] : capabilities.Audio.Reason;
         RecordingSizeBox.Text = settings.RecordingMaxSize?.ToString() ?? string.Empty;
         RecordingFpsBox.Text = settings.RecordingMaxFps?.ToString() ?? string.Empty;
         RecordingBitrateBox.Text = settings.RecordingBitrateMbps?.ToString() ?? string.Empty;
@@ -70,7 +74,7 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         var format = (RecordingFormatBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "mp4";
-        var codec = (RecordingCodecBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "h264";
+        var codec = RecordingCodecBox.SelectedValue as string ?? "h264";
         var requested = ShortcutItems.Select(item => item.ToBinding()).Where(item => !string.IsNullOrWhiteSpace(item.Gesture)).ToArray();
         var resolved = ShortcutBindingResolver.ReplaceConflicts(requested);
         if (resolved.Count != requested.Length && MessageBox.Show(LocalizationService.Current["ShortcutConflictReplace"], LocalizationService.Current["Shortcuts"], MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
@@ -112,6 +116,7 @@ public partial class SettingsWindow : Window
     }
     private static SolidColorBrush Brush(byte red, byte green, byte blue) => new(Color.FromRgb(red, green, blue));
     private sealed record LanguageOption(string Code, string Name);
+    private sealed record CodecOption(string Code, string Label);
     public sealed class ShortcutEditorItem
     {
         public ShortcutAction Action { get; init; }

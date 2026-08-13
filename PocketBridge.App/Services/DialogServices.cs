@@ -4,7 +4,7 @@ using PocketBridge.Core.Services;
 
 namespace PocketBridge.App.Services;
 
-public interface ISettingsDialogService { Task<bool> ShowAsync(); }
+public interface ISettingsDialogService { Task<bool> ShowAsync(DeviceMediaCapabilities? capabilities = null); }
 public interface IDeviceProfileDialogService { Task<bool> ShowAsync(AndroidDevice device); }
 public interface IConfirmationService { bool Confirm(string title, string message); }
 
@@ -24,9 +24,9 @@ public sealed class SettingsDialogService : ISettingsDialogService
         _runtimeTools = runtimeTools;
         _updates = updates;
     }
-    public async Task<bool> ShowAsync()
+    public async Task<bool> ShowAsync(DeviceMediaCapabilities? capabilities = null)
     {
-        var dialog = new SettingsWindow(_settingsService.Load(), _runtimeTools, _updates) { Owner = Application.Current.MainWindow };
+        var dialog = new SettingsWindow(_settingsService.Load(), _runtimeTools, _updates, capabilities) { Owner = Application.Current.MainWindow };
         if (dialog.ShowDialog() != true || dialog.Result is null) return false;
         await _settingsService.SaveAsync(dialog.Result);
         return true;

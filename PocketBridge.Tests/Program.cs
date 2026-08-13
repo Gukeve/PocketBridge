@@ -35,6 +35,12 @@ var tests = new (string Name, Action Run)[]
     ,("Shortcut bindings persist in settings", ShortcutBindingsPersist)
     ,("App icon cache is version keyed and invalidatable", AppIconCacheIsVersionKeyed)
     ,("Audio capability requires runtime and Android 11", AudioCapabilityIsDetected)
+    ,("Application icon retrieval failure keeps placeholder", ApplicationIconFailureFallsBack)
+    ,("Transfer history persists with a 500-entry bound", TransferHistoryPersistsBounded)
+    ,("Corrupted transfer history is quarantined", CorruptedTransferHistoryRecovers)
+    ,("Transfer history filters combine status and device", TransferHistoryFiltersCombine)
+    ,("Codec availability parses encoders", CodecAvailabilityParsesEncoders)
+    ,("Unsupported recording combinations are rejected", UnsupportedRecordingCombinationIsRejected)
 };
 
 var failed = 0;
@@ -293,9 +299,10 @@ static void PreventsClipboardFeedbackLoops()
 static void ProcessesFileTransferQueue()
 {
     var path = Path.Combine(Path.GetTempPath(), $"PocketBridge-transfer-{Guid.NewGuid():N}.txt");
+    var historyPath = Path.Combine(Path.GetTempPath(), $"PocketBridge-transfer-history-{Guid.NewGuid():N}.json");
     File.WriteAllText(path, "test");
     var executor = new RecordingTransferExecutor();
-    var queue = new FileTransferQueueService(executor);
+    var queue = new FileTransferQueueService(executor, historyPath);
     try
     {
         var id = queue.Enqueue(new[] { new FileTransferRequest(path, "/sdcard/Download/test.txt", "QUEUE-SERIAL", FileTransferOperation.Upload, "Test phone") }).Single();
@@ -310,12 +317,16 @@ static void ProcessesFileTransferQueue()
         Equal(4L, completed.Bytes);
         True(completed.Duration is not null, "Completed transfer must include duration metadata.");
         Equal("PC → Android", completed.Direction);
-        Equal(1, queue.ClearCompleted());
+        var persistDeadline = DateTime.UtcNow.AddSeconds(2); while (!File.Exists(historyPath) && DateTime.UtcNow < persistDeadline) Thread.Sleep(10);
+        var restored = new FileTransferQueueService(executor, historyPath);
+        try { var persisted = restored.Items.Single(item => item.Id == id); Equal(FileTransferState.Completed, persisted.State); Equal("Test phone", persisted.DeviceAlias); }
+        finally { restored.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
     }
     finally
     {
         queue.DisposeAsync().AsTask().GetAwaiter().GetResult();
         File.Delete(path);
+        if (File.Exists(historyPath)) File.Delete(historyPath);
     }
 }
 
@@ -420,10 +431,11 @@ static void AppIconCacheIsVersionKeyed()
     var first = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 1), Load).GetAwaiter().GetResult();
     var repeated = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 1), Load).GetAwaiter().GetResult();
     var updated = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 2), Load).GetAwaiter().GetResult();
-    Equal(2, loads); Equal(first![0], repeated![0]); True(updated![0] != first[0], "A changed version must use a new cache entry.");
+    var otherDevice = cache.GetAsync(new AppIconCacheKey("OTHER", "com.example.app", 2), Load).GetAwaiter().GetResult();
+    Equal(3, loads); Equal(first![0], repeated![0]); True(updated![0] != first[0], "A changed version must use a new cache entry."); True(otherDevice![0] != updated[0], "Identical packages on different serials must not share icons.");
     cache.Invalidate("S", "com.example.app");
     cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 2), Load).GetAwaiter().GetResult();
-    Equal(3, loads);
+    Equal(4, loads);
 }
 
 static void AudioCapabilityIsDetected()
@@ -432,6 +444,64 @@ static void AudioCapabilityIsDetected()
     True(!AudioCapabilityDetector.Evaluate(29, true).IsSupported, "Android 10 must not advertise audio capture.");
     var supported = AudioCapabilityDetector.Evaluate(30, true);
     True(supported.IsSupported && supported.Codec == "opus", "Android 11 with runtime should advertise the selected codec.");
+}
+
+static void ApplicationIconFailureFallsBack()
+{
+    var service = new ApplicationIconService(new FailingIconAdbService(), new AppIconCache());
+    var app = new InstalledApplication("com.example.missing", "Missing", "1", 1, AndroidApplicationType.User);
+    var icon = service.GetAsync("ICON-SERIAL", app).GetAwaiter().GetResult();
+    True(icon is null, "Failed retrieval must preserve the UI placeholder.");
+}
+
+static void TransferHistoryPersistsBounded()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"PocketBridge-history-{Guid.NewGuid():N}"); Directory.CreateDirectory(root);
+    var path = Path.Combine(root, "history.json");
+    try
+    {
+        var snapshots = Enumerable.Range(0, 505).Select(index => new FileTransferSnapshot(Guid.NewGuid(), $"C:\\private\\{index}.bin", $"/sdcard/{index}.bin", "SERIAL", FileTransferOperation.Upload, 1, FileTransferState.Completed, null, DateTimeOffset.UtcNow.AddMinutes(-index), "Phone", index, TimeSpan.FromSeconds(1), "PC → Android")).ToArray();
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(snapshots));
+        var queue = new FileTransferQueueService(new RecordingTransferExecutor(), path);
+        try { Equal(500, queue.Items.Count); }
+        finally { queue.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static void CorruptedTransferHistoryRecovers()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"PocketBridge-history-{Guid.NewGuid():N}"); Directory.CreateDirectory(root);
+    var path = Path.Combine(root, "history.json"); File.WriteAllText(path, "{ broken");
+    try
+    {
+        var queue = new FileTransferQueueService(new RecordingTransferExecutor(), path);
+        try { Equal(0, queue.Items.Count); True(queue.DiagnosticMessage is not null, "Recovery must expose a diagnostic message."); True(Directory.GetFiles(root, "*.corrupt-*").Length == 1, "Damaged history must be quarantined."); }
+        finally { queue.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+    }
+    finally { Directory.Delete(root, true); }
+}
+
+static void TransferHistoryFiltersCombine()
+{
+    var item = new FileTransferSnapshot(Guid.NewGuid(), "C:\\private\\a.apk", "package", "SERIAL", FileTransferOperation.InstallApk, 0, FileTransferState.Failed, "offline", DateTimeOffset.UtcNow, "Lab phone", 42, TimeSpan.FromSeconds(2), "APK install");
+    True(TransferHistoryFilter.Matches(item, "Lab", FileTransferState.Failed), "Matching device and status must pass.");
+    True(!TransferHistoryFilter.Matches(item, "Other", FileTransferState.Failed), "Device filter must be combined with status.");
+    True(!TransferHistoryFilter.Matches(item, "Lab", FileTransferState.Completed), "Wrong status must be rejected.");
+}
+
+static void CodecAvailabilityParsesEncoders()
+{
+    var codecs = VideoCodecCapabilityDetector.ParseEncoders("c2.vendor.avc.encoder\nOMX.vendor.hevc.encoder\nc2.android.av1.decoder");
+    True(codecs.SequenceEqual(new[] { "h264", "h265" }), "Only actual encoder entries must be advertised.");
+}
+
+static void UnsupportedRecordingCombinationIsRejected()
+{
+    var capabilities = new DeviceMediaCapabilities(AudioCapabilityDetector.Evaluate(29, true), new[] { "h264" });
+    True(!capabilities.Supports(new RecordingOptions("mp4", "h265", false, null, 30, 8), out _), "Unavailable H.265 must be rejected before launch.");
+    True(!capabilities.Supports(new RecordingOptions("mp4", "h264", true, null, 30, 8), out _), "Audio recording must be rejected when capture is unsupported.");
+    True(capabilities.Supports(new RecordingOptions("mkv", "h264", false, 1280, 30, 8), out _), "Supported video-only settings must remain valid.");
 }
 
 static void True(bool condition, string message)
@@ -466,6 +536,16 @@ sealed class GroupRecordingAdbService(string failedSerial) : IAdbService
             ? new AdbCommandResult(1, string.Empty, "simulated failure")
             : new AdbCommandResult(0, "ok", string.Empty));
     }
+    public Task<AdbCommandResult> ExecuteHostAsync(params string[] arguments) => throw new NotSupportedException();
+    public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task StartServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task KillServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+sealed class FailingIconAdbService : IAdbService
+{
+    public Task<IReadOnlyList<AndroidDevice>> GetDevicesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AndroidDevice>>(Array.Empty<AndroidDevice>());
+    public Task<AdbCommandResult> ExecuteAsync(string serial, params string[] arguments) => Task.FromResult(new AdbCommandResult(1, string.Empty, "package unavailable"));
     public Task<AdbCommandResult> ExecuteHostAsync(params string[] arguments) => throw new NotSupportedException();
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task StartServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

@@ -36,4 +36,6 @@
   <data name="StartAudio" xml:space="preserve"><value>Включить звук</value></data><data name="StopAudio" xml:space="preserve"><value>Выключить звук</value></data>
   <data name="RecordingVideoCodec" xml:space="preserve"><value>Видеокодек</value></data><data name="RecordingAudioTrack" xml:space="preserve"><value>Добавлять аудиодорожку, если поддерживается</value></data>
   <data name="AudioNotChecked" xml:space="preserve"><value>Звук: выберите устройство</value></data><data name="AudioSupported" xml:space="preserve"><value>Передача звука: поддерживается ({0}, API {1})</value></data><data name="AudioUnsupported" xml:space="preserve"><value>Передача звука: не поддерживается — {0}</value></data>
+  <data name="AllStatuses" xml:space="preserve"><value>Все статусы</value></data><data name="CopyDestination" xml:space="preserve"><value>Копировать путь назначения</value></data>
+  <data name="SelectDeviceForCapabilities" xml:space="preserve"><value>Выберите устройство для определения возможностей звука и кодеков.</value></data><data name="AudioAvailable" xml:space="preserve"><value>Запись звука доступна на выбранном устройстве.</value></data>
 </root>
