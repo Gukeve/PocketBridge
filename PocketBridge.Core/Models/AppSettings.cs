@@ -16,4 +16,9 @@ public sealed record AppSettings
     public int? RecordingMaxSize { get; init; }
     public int? RecordingMaxFps { get; init; } = 60;
     public int? RecordingBitrateMbps { get; init; } = 8;
+    public IReadOnlyList<AutomationRule> AutomationRules { get; init; } = Array.Empty<AutomationRule>();
+    public bool LanEnabled { get; init; }
+    public string LanBindAddress { get; init; } = "127.0.0.1";
+    public int LanPort { get; init; } = 27183;
+    public InputBackendKind InputBackend { get; init; } = InputBackendKind.Automatic;
 }

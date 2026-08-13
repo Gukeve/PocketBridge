@@ -23,6 +23,8 @@ public interface IFeatureDialogService
     void ShowMediaResult(string filePath, bool canCopy);
     void ShowDeviceInformation(AndroidDevice device);
     void ShowAdbConsole(AndroidDevice device);
+    void ShowInputMapping();
+    void ShowExperimental(AndroidDevice device);
 }
 
 public sealed class FeatureDialogService : IFeatureDialogService
@@ -39,11 +41,12 @@ public sealed class FeatureDialogService : IFeatureDialogService
     private readonly IAppSettingsService _settings;
     private readonly IDeviceInformationService _deviceInformation;
     private readonly IAdbConsoleService _adbConsole;
+    private readonly IInputMappingService _inputMappings; private readonly IP3CapabilityService _p3Capabilities; private readonly IGamepadService _gamepads; private readonly IInputBackendService _inputBackend; private readonly IVirtualDisplayService _virtualDisplays; private readonly ILanServerService _lan; private readonly IRemoteSessionService _remoteSessions; private readonly IAutomationService _automation;
     private TransferQueueWindow? _transferWindow;
 
-    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications, IApplicationIconService applicationIcons, IAppSettingsService settings, IDeviceInformationService deviceInformation, IAdbConsoleService adbConsole)
+    public FeatureDialogService(IApkInstallerService apkInstaller, IWifiAdbService wifi, IAdbFileService files, IScreenshotService screenshots, IConfirmationService confirmation, IDeviceProfileService profiles, IFileTransferQueueService transfers, IApplicationService applications, IApplicationIconService applicationIcons, IAppSettingsService settings, IDeviceInformationService deviceInformation, IAdbConsoleService adbConsole, IInputMappingService inputMappings, IP3CapabilityService p3Capabilities, IGamepadService gamepads, IInputBackendService inputBackend, IVirtualDisplayService virtualDisplays, ILanServerService lan, IRemoteSessionService remoteSessions, IAutomationService automation)
     {
-        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications; _applicationIcons = applicationIcons; _settings = settings; _deviceInformation = deviceInformation; _adbConsole = adbConsole;
+        _apkInstaller = apkInstaller; _wifi = wifi; _files = files; _screenshots = screenshots; _confirmation = confirmation; _profiles = profiles; _transfers = transfers; _applications = applications; _applicationIcons = applicationIcons; _settings = settings; _deviceInformation = deviceInformation; _adbConsole = adbConsole; _inputMappings = inputMappings; _p3Capabilities = p3Capabilities; _gamepads = gamepads; _inputBackend = inputBackend; _virtualDisplays = virtualDisplays; _lan = lan; _remoteSessions = remoteSessions; _automation = automation;
     }
 
     public async Task<string?> InstallApkAsync(AndroidDevice device, string? apkPath = null)
@@ -168,6 +171,8 @@ public sealed class FeatureDialogService : IFeatureDialogService
     public void ShowMediaResult(string filePath, bool canCopy) => new MediaResultWindow(filePath, canCopy) { Owner = Application.Current.MainWindow }.Show();
     public void ShowDeviceInformation(AndroidDevice device) => new DeviceInformationWindow(device, _deviceInformation) { Owner = Application.Current.MainWindow }.Show();
     public void ShowAdbConsole(AndroidDevice device) => new AdbConsoleWindow(device, _adbConsole) { Owner = Application.Current.MainWindow }.Show();
+    public void ShowInputMapping() => new InputMappingWindow(_inputMappings) { Owner = Application.Current.MainWindow }.Show();
+    public void ShowExperimental(AndroidDevice device) => new ExperimentalWindow(device, _p3Capabilities, _gamepads, _inputBackend, _virtualDisplays, _lan, _remoteSessions, _automation) { Owner = Application.Current.MainWindow }.Show();
 
     private static string NormalizeDestination(string value)
     {

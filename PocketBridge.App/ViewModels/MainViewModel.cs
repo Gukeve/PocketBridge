@@ -28,6 +28,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IGroupActionService _groupActions;
     private readonly IAudioForwardingService _audio;
     private readonly IDeviceMediaCapabilityService _mediaCapabilityService;
+    private readonly ILanServerService _lan;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
@@ -61,7 +62,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IRecordingService recordings,
         IGroupActionService groupActions,
         IAudioForwardingService audio,
-        IDeviceMediaCapabilityService mediaCapabilityService)
+        IDeviceMediaCapabilityService mediaCapabilityService,
+        ILanServerService lan)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -78,6 +80,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _groupActions = groupActions;
         _audio = audio;
         _mediaCapabilityService = mediaCapabilityService;
+        _lan = lan;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
@@ -108,6 +111,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ToggleRecordingCommand = new AsyncRelayCommand(ToggleRecordingAsync, CanControl);
         OpenDeviceInformationCommand = new RelayCommand(OpenDeviceInformation, CanControl);
         OpenAdbConsoleCommand = new RelayCommand(OpenAdbConsole, CanControl);
+        OpenInputMappingCommand = new RelayCommand(_featureDialogs.ShowInputMapping);
+        OpenExperimentalCommand = new RelayCommand(() => { if (SelectedDevice is { } selected) _featureDialogs.ShowExperimental(selected.Device); }, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         GroupHomeCommand = GroupCommand(GroupAction.Home);
@@ -157,6 +162,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand ToggleRecordingCommand { get; }
     public RelayCommand OpenDeviceInformationCommand { get; }
     public RelayCommand OpenAdbConsoleCommand { get; }
+    public RelayCommand OpenInputMappingCommand { get; }
+    public RelayCommand OpenExperimentalCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
     public AsyncRelayCommand GroupHomeCommand { get; }
@@ -600,7 +607,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             if (!_clipboardSessions.Add(session)) continue;
             session.ClipboardChanged += OnClipboardChanged;
+            session.FrameReady += OnLanFrameReady;
         }
+    }
+
+    private void OnLanFrameReady(object? sender, VideoFrameEventArgs e)
+    {
+        if (!_lan.IsRunning || sender is not IEmbeddedDisplaySession session) return;
+        var alias = Devices.FirstOrDefault(item => item.Serial == session.Serial)?.FriendlyName ?? session.DeviceName;
+        _lan.PublishFrame(alias, e.Frame);
     }
 
     private void OnClipboardChanged(object? sender, DeviceClipboardEventArgs e)
@@ -871,7 +886,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); ToggleAudioCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); ToggleAudioCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged(); OpenExperimentalCommand.NotifyCanExecuteChanged();
         GroupHomeCommand.NotifyCanExecuteChanged(); GroupBackCommand.NotifyCanExecuteChanged(); GroupRecentsCommand.NotifyCanExecuteChanged(); GroupVolumeUpCommand.NotifyCanExecuteChanged(); GroupVolumeDownCommand.NotifyCanExecuteChanged(); GroupPowerCommand.NotifyCanExecuteChanged(); GroupRebootCommand.NotifyCanExecuteChanged(); GroupScreenshotCommand.NotifyCanExecuteChanged(); GroupSendFilesCommand.NotifyCanExecuteChanged(); GroupInstallApkCommand.NotifyCanExecuteChanged();
     }
 

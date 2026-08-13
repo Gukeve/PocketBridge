@@ -41,6 +41,14 @@ var tests = new (string Name, Action Run)[]
     ,("Transfer history filters combine status and device", TransferHistoryFiltersCombine)
     ,("Codec availability parses encoders", CodecAvailabilityParsesEncoders)
     ,("Unsupported recording combinations are rejected", UnsupportedRecordingCombinationIsRejected)
+    ,("Normalized touch mapping survives orientation", NormalizedTouchMappingSurvivesOrientation)
+    ,("Input profiles export without device association", InputProfilesExportPortable)
+    ,("Gamepad mapping honors dead zone", GamepadMappingHonorsDeadZone)
+    ,("HID backend falls back when unavailable", HidBackendFallsBack)
+    ,("Remote sessions expire and revoke", RemoteSessionsExpireAndRevoke)
+    ,("Automation destructive actions require opt-in", AutomationDestructiveRequiresOptIn)
+    ,("Audit log remains bounded", AuditLogRemainsBounded)
+    ,("LAN access is disabled by default", LanAccessDisabledByDefault)
 };
 
 var failed = 0;
@@ -502,6 +510,55 @@ static void UnsupportedRecordingCombinationIsRejected()
     True(!capabilities.Supports(new RecordingOptions("mp4", "h265", false, null, 30, 8), out _), "Unavailable H.265 must be rejected before launch.");
     True(!capabilities.Supports(new RecordingOptions("mp4", "h264", true, null, 30, 8), out _), "Audio recording must be rejected when capture is unsupported.");
     True(capabilities.Supports(new RecordingOptions("mkv", "h264", false, 1280, 30, 8), out _), "Supported video-only settings must remain valid.");
+}
+
+static void NormalizedTouchMappingSurvivesOrientation()
+{
+    var point = new NormalizedPoint(0.25, 0.75); Equal((250, 1500), point.ToPixels(1000, 2000)); Equal((250, 500), point.ToPixels(1000, 2000, 1));
+    Equal((1000, 0), new NormalizedPoint(2, -1).ToPixels(1000, 2000));
+}
+
+static void InputProfilesExportPortable()
+{
+    var profile = new InputProfile(Guid.NewGuid(), "Game", new[] { new KeyBinding(InputSourceKind.KeyboardKey, "W", new InputAction(InputActionKind.TouchPoint, "tap", new NormalizedPoint(.5, .4))) }, "Private phone");
+    var restored = InputProfileSerializer.Import(InputProfileSerializer.Export(profile));
+    Equal("Game", restored.Name); True(restored.TargetAlias is null, "Portable export must omit device association."); Equal(.5, restored.Bindings[0].Action.Point!.X);
+}
+
+static void GamepadMappingHonorsDeadZone()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"PocketBridge-input-{Guid.NewGuid():N}"); var settings = new JsonAppSettingsService(Path.Combine(root, "settings.json"));
+    try
+    {
+        var profile = new InputProfile(Guid.NewGuid(), "Pad", new[] { new KeyBinding(InputSourceKind.GamepadAxis, "LeftX", new InputAction(InputActionKind.VirtualJoystick, "move"), .2) }); settings.SaveAsync(new AppSettings { InputProfiles = new[] { profile } }).GetAwaiter().GetResult();
+        var mappings = new InputMappingService(settings); True(mappings.Resolve(profile.Id, InputSourceKind.GamepadAxis, "LeftX", .1) is null, "Dead-zone input must be ignored."); True(mappings.Resolve(profile.Id, InputSourceKind.GamepadAxis, "LeftX", .5) is not null, "Input above dead zone must resolve.");
+    }
+    finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+}
+
+static void HidBackendFallsBack()
+{
+    var unavailable = new HidOtgCapabilities(CapabilityState.Unsupported, CapabilityState.Unsupported, CapabilityState.RequiresUsb, "unsupported"); Equal(InputBackendKind.ScrcpyControl, InputBackendSelector.Select(InputBackendKind.HidInput, unavailable)); Equal(InputBackendKind.ScrcpyControl, InputBackendSelector.Select(InputBackendKind.Automatic, unavailable));
+}
+
+static void RemoteSessionsExpireAndRevoke()
+{
+    var service = new RemoteSessionService(); var created = service.Create(RemotePermission.ViewScreen, TimeSpan.FromMinutes(1)); True(service.Authenticate(created.Token, DateTimeOffset.UtcNow) is not null, "Valid token was rejected."); True(service.Authenticate(created.Token, DateTimeOffset.UtcNow.AddMinutes(2)) is null, "Expired token was accepted."); service.Revoke(created.Session.Id); True(service.Authenticate(created.Token, DateTimeOffset.UtcNow) is null, "Revoked token was accepted.");
+}
+
+static void AutomationDestructiveRequiresOptIn()
+{
+    var rule = new AutomationRule(Guid.NewGuid(), "Reboot", true, AutomationTrigger.DeviceConnected, AutomationAction.Reboot, AutomationRisk.Destructive, null, RemotePermission.DeviceButtons); True(!AutomationPermissionPolicy.IsAllowed(rule, false), "Destructive automation ran without opt-in."); True(AutomationPermissionPolicy.IsAllowed(rule, true), "Explicitly permitted destructive automation was rejected.");
+}
+
+static void AuditLogRemainsBounded()
+{
+    var log = new AuditLogService(3); for (var index = 0; index < 5; index++) log.Append(new AuditRecord(DateTimeOffset.UtcNow, "Local user", "Phone", $"Action {index}", "Success")); Equal(3, log.Items.Count); Equal("Action 4", log.Items[0].Action);
+}
+
+static void LanAccessDisabledByDefault()
+{
+    var settings = new AppSettings(); True(!settings.LanEnabled, "LAN must be opt-in."); Equal("127.0.0.1", settings.LanBindAddress);
 }
 
 static void True(bool condition, string message)
