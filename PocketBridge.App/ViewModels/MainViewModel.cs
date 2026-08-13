@@ -162,6 +162,34 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public int GroupTargetCount => Devices.Count(device => device.IsGroupSelected && device.Device.IsReady);
     public string GroupTargetCountText => LocalizationService.Current.Format("GroupTargetsFormat", GroupTargetCount);
 
+    public ShortcutAction? MatchShortcut(string gesture)
+    {
+        var scopes = new[] { IsMultiView ? ShortcutScope.MultiView : ShortcutScope.EmbeddedView, ShortcutScope.SelectedDevice, ShortcutScope.Global };
+        return _settings.Load().ShortcutBindings.FirstOrDefault(binding => scopes.Contains(binding.Scope) && string.Equals(binding.Gesture, gesture, StringComparison.OrdinalIgnoreCase))?.Action;
+    }
+
+    public void ExecuteShortcut(ShortcutAction action)
+    {
+        var command = action switch
+        {
+            ShortcutAction.Home => HomeCommand,
+            ShortcutAction.Back => BackCommand,
+            ShortcutAction.Recents => RecentsCommand,
+            ShortcutAction.Screenshot => ScreenshotCommand,
+            ShortcutAction.ToggleRecording => ToggleRecordingCommand,
+            ShortcutAction.SendClipboard => SendClipboardCommand,
+            ShortcutAction.RefreshDevices => RefreshCommand,
+            _ => null
+        };
+        if (command?.CanExecute(null) == true) command.Execute(null);
+        if (action is ShortcutAction.NextDevice or ShortcutAction.PreviousDevice && Devices.Count > 0)
+        {
+            var current = Math.Max(0, Devices.IndexOf(SelectedDevice!));
+            var delta = action == ShortcutAction.NextDevice ? 1 : -1;
+            SelectedDevice = Devices[(current + delta + Devices.Count) % Devices.Count];
+        }
+    }
+
     public DeviceItemViewModel? SelectedDevice
     {
         get => _selectedDevice;

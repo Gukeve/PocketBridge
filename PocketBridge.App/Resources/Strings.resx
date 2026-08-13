@@ -41,4 +41,5 @@
   <data name="GroupFailed" xml:space="preserve"><value>{0}: failed — {1}</value></data>
   <data name="GroupRebootTitle" xml:space="preserve"><value>Restart selected devices</value></data>
   <data name="GroupRebootConfirm" xml:space="preserve"><value>Restart {0} selected device(s)?</value></data>
+  <data name="Shortcuts" xml:space="preserve"><value>Keyboard shortcuts</value></data><data name="ShortcutsHelp" xml:space="preserve"><value>Use WPF gesture names such as Ctrl+H or F11. A duplicate gesture replaces the earlier action only within the same scope.</value></data><data name="ResetDefaults" xml:space="preserve"><value>Reset defaults</value></data><data name="ShortcutConflictReplace" xml:space="preserve"><value>Conflicting shortcuts were found in the same scope. Replace the earlier bindings with the last assignments?</value></data>
 </root>

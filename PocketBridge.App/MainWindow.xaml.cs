@@ -55,7 +55,15 @@ public partial class MainWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape && _fullscreen) { ToggleFullscreen(); e.Handled = true; }
-        else if (e.Key == Key.F11 || (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))) { ToggleFullscreen(); e.Handled = true; }
+        else
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            var gesture = new KeyGesture(key, Keyboard.Modifiers).GetDisplayStringForCulture(System.Globalization.CultureInfo.InvariantCulture);
+            var action = _viewModel.MatchShortcut(gesture);
+            if (action == PocketBridge.Core.Models.ShortcutAction.ToggleFullscreen) ToggleFullscreen();
+            else if (action is not null) _viewModel.ExecuteShortcut(action.Value);
+            e.Handled = action is not null;
+        }
     }
 
     private void Window_MouseMove(object sender, MouseEventArgs e)

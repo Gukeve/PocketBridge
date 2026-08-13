@@ -31,6 +31,8 @@ var tests = new (string Name, Action Run)[]
     ("Rejects Android versions unsupported by scrcpy", RejectsUnsupportedScrcpyAndroid),
     ("Formats screenshot names without corrupting literals", FormatsScreenshotFilename)
     ,("Group actions remain serial scoped and tolerate partial failure", GroupActionsAreIsolated)
+    ,("Shortcut conflict replacement is scope aware", ShortcutConflictReplacementIsScopeAware)
+    ,("Shortcut bindings persist in settings", ShortcutBindingsPersist)
 };
 
 var failed = 0;
@@ -376,6 +378,33 @@ static void GroupActionsAreIsolated()
     True(adb.Serials.SequenceEqual(new[] { "SERIAL-A", "SERIAL-B", "SERIAL-C" }), "Every command must use exactly the explicitly selected serial.");
     True(adb.Arguments.All(x => x.SequenceEqual(new[] { "shell", "input", "keyevent", "KEYCODE_HOME" })), "Unexpected group command arguments.");
     True(results[0].Success && !results[1].Success && results[2].Success, "A failed target must not stop later targets.");
+}
+
+static void ShortcutConflictReplacementIsScopeAware()
+{
+    var bindings = ShortcutBindingResolver.ReplaceConflicts(new[]
+    {
+        new ShortcutBinding(ShortcutAction.Home, ShortcutScope.Global, "F5"),
+        new ShortcutBinding(ShortcutAction.Back, ShortcutScope.SelectedDevice, "F5"),
+        new ShortcutBinding(ShortcutAction.RefreshDevices, ShortcutScope.Global, "f5")
+    });
+    Equal(2, bindings.Count);
+    True(bindings.Any(x => x.Action == ShortcutAction.RefreshDevices && x.Scope == ShortcutScope.Global), "The newest same-scope binding must replace the conflicting binding.");
+    True(bindings.Any(x => x.Action == ShortcutAction.Back && x.Scope == ShortcutScope.SelectedDevice), "The same gesture in another scope must remain valid.");
+}
+
+static void ShortcutBindingsPersist()
+{
+    var path = Path.Combine(Path.GetTempPath(), $"PocketBridge-settings-{Guid.NewGuid():N}.json");
+    try
+    {
+        var service = new JsonAppSettingsService(path);
+        var expected = new[] { new ShortcutBinding(ShortcutAction.Screenshot, ShortcutScope.EmbeddedView, "Ctrl+9") };
+        service.SaveAsync(new AppSettings { ShortcutBindings = expected }).GetAwaiter().GetResult();
+        var actual = service.Load().ShortcutBindings.Single();
+        Equal(expected[0], actual);
+    }
+    finally { if (File.Exists(path)) File.Delete(path); }
 }
 
 static void True(bool condition, string message)

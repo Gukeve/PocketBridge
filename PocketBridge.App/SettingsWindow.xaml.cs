@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Collections.ObjectModel;
 using PocketBridge.App.Localization;
 using PocketBridge.Core.Models;
 using PocketBridge.Core.Services;
@@ -23,7 +24,9 @@ public partial class SettingsWindow : Window
         _updates = updates;
         _initialSettings = settings;
         _initialLanguage = LocalizationService.NormalizeLanguage(settings.Language);
+        ShortcutItems = new ObservableCollection<ShortcutEditorItem>((settings.ShortcutBindings.Count == 0 ? ShortcutBinding.Defaults : settings.ShortcutBindings).Select(ShortcutEditorItem.From));
         InitializeComponent();
+        DataContext = this;
         LanguageBox.ItemsSource = new[] { new LanguageOption("ru-RU", "Русский"), new LanguageOption("en-US", "English"), new LanguageOption("zh-CN", "简体中文") };
         LanguageBox.SelectedValuePath = nameof(LanguageOption.Code);
         LanguageBox.DisplayMemberPath = nameof(LanguageOption.Name);
@@ -38,6 +41,7 @@ public partial class SettingsWindow : Window
     }
 
     public AppSettings? Result { get; private set; }
+    public ObservableCollection<ShortcutEditorItem> ShortcutItems { get; }
 
     private void ToolsDirectoryBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateComponentStatus();
     private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => LanguageRestartText.Visibility = Equals(LanguageBox.SelectedValue, _initialLanguage) ? Visibility.Collapsed : Visibility.Visible;
@@ -61,8 +65,12 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         var format = (RecordingFormatBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "mp4";
-        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage, RecordingFolder = RecordingFolderBox.Text.Trim(), RecordingFormat = format, ScreenshotFolder = ScreenshotFolderBox.Text.Trim(), ScreenshotFilenameFormat = ScreenshotFormatBox.Text.Trim() }; DialogResult = true;
+        var requested = ShortcutItems.Select(item => item.ToBinding()).Where(item => !string.IsNullOrWhiteSpace(item.Gesture)).ToArray();
+        var resolved = ShortcutBindingResolver.ReplaceConflicts(requested);
+        if (resolved.Count != requested.Length && MessageBox.Show(LocalizationService.Current["ShortcutConflictReplace"], LocalizationService.Current["Shortcuts"], MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage, RecordingFolder = RecordingFolderBox.Text.Trim(), RecordingFormat = format, ScreenshotFolder = ScreenshotFolderBox.Text.Trim(), ScreenshotFilenameFormat = ScreenshotFormatBox.Text.Trim(), ShortcutBindings = resolved }; DialogResult = true;
     }
+    private void ResetShortcuts_Click(object sender, RoutedEventArgs e) { ShortcutItems.Clear(); foreach (var item in ShortcutBinding.Defaults.Select(ShortcutEditorItem.From)) ShortcutItems.Add(item); }
     private void BrowseRecording_Click(object sender, RoutedEventArgs e) => BrowseFolder(RecordingFolderBox);
     private void BrowseScreenshot_Click(object sender, RoutedEventArgs e) => BrowseFolder(ScreenshotFolderBox);
     private void BrowseFolder(TextBox target) { var picker = new Microsoft.Win32.OpenFolderDialog { InitialDirectory = target.Text }; if (picker.ShowDialog(this) == true) target.Text = picker.FolderName; }
@@ -97,4 +105,12 @@ public partial class SettingsWindow : Window
     }
     private static SolidColorBrush Brush(byte red, byte green, byte blue) => new(Color.FromRgb(red, green, blue));
     private sealed record LanguageOption(string Code, string Name);
+    public sealed class ShortcutEditorItem
+    {
+        public ShortcutAction Action { get; init; }
+        public ShortcutScope Scope { get; init; }
+        public string Gesture { get; set; } = string.Empty;
+        public ShortcutBinding ToBinding() => new(Action, Scope, Gesture);
+        public static ShortcutEditorItem From(ShortcutBinding binding) => new() { Action = binding.Action, Scope = binding.Scope, Gesture = binding.Gesture };
+    }
 }
