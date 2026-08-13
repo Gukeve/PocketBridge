@@ -25,4 +25,10 @@
 <data name="Fullscreen"><value>⛶ Полный экран</value></data>
 <data name="Advanced"><value>Дополнительно</value></data><data name="DeviceInformation"><value>Информация об устройстве</value></data><data name="HidePrivateDeviceData"><value>Скрыть serial/IP для приватности</value></data><data name="CopyDeviceInformation"><value>Копировать информацию</value></data><data name="Manufacturer"><value>Производитель</value></data><data name="Model"><value>Модель</value></data><data name="AndroidVersion"><value>Версия Android</value></data><data name="Serial"><value>Серийный номер</value></data><data name="ConnectionType"><value>Тип подключения</value></data><data name="Battery"><value>Батарея</value></data><data name="Storage"><value>Хранилище</value></data><data name="Uptime"><value>Время работы</value></data><data name="AdbConsole"><value>ADB-консоль</value></data><data name="AdbConsoleTarget"><value>Устройство: {0}    Serial: {1}</value></data><data name="RunCommand"><value>Выполнить</value></data><data name="AddTimestamps"><value>Добавлять время</value></data><data name="CancelCommand"><value>Отменить команду</value></data><data name="Clear"><value>Очистить</value></data><data name="CopyOutput"><value>Копировать вывод</value></data><data name="CommandCancelled"><value>Команда отменена.</value></data>
 <data name="ScrcpyAndroidUnsupported"><value>На устройстве Android API {0}. Официальному runtime scrcpy требуется API {1} (Android 5.0) или новее.</value></data>
+  <data name="GroupActions" xml:space="preserve"><value>Групповые действия</value></data>
+  <data name="GroupTargetsFormat" xml:space="preserve"><value>Выбрано устройств: {0}</value></data>
+  <data name="GroupSuccess" xml:space="preserve"><value>{0}: выполнено</value></data>
+  <data name="GroupFailed" xml:space="preserve"><value>{0}: ошибка — {1}</value></data>
+  <data name="GroupRebootTitle" xml:space="preserve"><value>Перезапуск выбранных устройств</value></data>
+  <data name="GroupRebootConfirm" xml:space="preserve"><value>Перезапустить выбранные устройства ({0})?</value></data>
 </root>

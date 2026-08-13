@@ -48,6 +48,8 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void GroupTarget_Changed(object sender, RoutedEventArgs e) => _viewModel.GroupSelectionChanged();
+
     private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

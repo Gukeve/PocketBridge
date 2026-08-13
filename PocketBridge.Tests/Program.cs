@@ -30,6 +30,7 @@ var tests = new (string Name, Action Run)[]
     ("Parses quoted ADB console commands", ParsesAdbConsoleCommand),
     ("Rejects Android versions unsupported by scrcpy", RejectsUnsupportedScrcpyAndroid),
     ("Formats screenshot names without corrupting literals", FormatsScreenshotFilename)
+    ,("Group actions remain serial scoped and tolerate partial failure", GroupActionsAreIsolated)
 };
 
 var failed = 0;
@@ -361,6 +362,22 @@ static void FormatsScreenshotFilename()
     True(!sanitized.Contains(':'), "Invalid Windows filename characters must be replaced.");
 }
 
+static void GroupActionsAreIsolated()
+{
+    var adb = new GroupRecordingAdbService("SERIAL-B");
+    var targets = new[]
+    {
+        new GroupActionTarget("SERIAL-A", "Alpha"),
+        new GroupActionTarget("SERIAL-B", "Beta"),
+        new GroupActionTarget("SERIAL-C", "Gamma")
+    };
+
+    var results = new GroupActionService(adb).ExecuteAsync(GroupAction.Home, targets).GetAwaiter().GetResult();
+    True(adb.Serials.SequenceEqual(new[] { "SERIAL-A", "SERIAL-B", "SERIAL-C" }), "Every command must use exactly the explicitly selected serial.");
+    True(adb.Arguments.All(x => x.SequenceEqual(new[] { "shell", "input", "keyevent", "KEYCODE_HOME" })), "Unexpected group command arguments.");
+    True(results[0].Success && !results[1].Success && results[2].Success, "A failed target must not stop later targets.");
+}
+
 static void True(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
@@ -375,6 +392,25 @@ sealed class RecordingAdbService : IAdbService
     public Task<IReadOnlyList<AndroidDevice>> GetDevicesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AndroidDevice>>(Array.Empty<AndroidDevice>());
     public Task<AdbCommandResult> ExecuteAsync(string serial, params string[] arguments) { LastSerial = serial; LastArguments = arguments; return Task.FromResult(_result); }
     public Task<AdbCommandResult> ExecuteHostAsync(params string[] arguments) { LastArguments = arguments; return Task.FromResult(_result); }
+    public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task StartServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task KillServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+sealed class GroupRecordingAdbService(string failedSerial) : IAdbService
+{
+    public List<string> Serials { get; } = new();
+    public List<IReadOnlyList<string>> Arguments { get; } = new();
+    public Task<IReadOnlyList<AndroidDevice>> GetDevicesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AndroidDevice>>(Array.Empty<AndroidDevice>());
+    public Task<AdbCommandResult> ExecuteAsync(string serial, params string[] arguments)
+    {
+        Serials.Add(serial);
+        Arguments.Add(arguments);
+        return Task.FromResult(serial == failedSerial
+            ? new AdbCommandResult(1, string.Empty, "simulated failure")
+            : new AdbCommandResult(0, "ok", string.Empty));
+    }
+    public Task<AdbCommandResult> ExecuteHostAsync(params string[] arguments) => throw new NotSupportedException();
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task StartServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task KillServerAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

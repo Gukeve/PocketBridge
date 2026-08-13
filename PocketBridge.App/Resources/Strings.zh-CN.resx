@@ -24,4 +24,10 @@
 <data name="Fullscreen"><value>⛶ 全屏</value></data>
 <data name="Advanced"><value>高级</value></data><data name="DeviceInformation"><value>设备信息</value></data><data name="HidePrivateDeviceData"><value>隐藏序列号/IP 以保护隐私</value></data><data name="CopyDeviceInformation"><value>复制设备信息</value></data><data name="Manufacturer"><value>制造商</value></data><data name="Model"><value>型号</value></data><data name="AndroidVersion"><value>Android 版本</value></data><data name="Serial"><value>序列号</value></data><data name="ConnectionType"><value>连接类型</value></data><data name="Battery"><value>电池</value></data><data name="Storage"><value>存储</value></data><data name="Uptime"><value>运行时间</value></data><data name="AdbConsole"><value>ADB 控制台</value></data><data name="AdbConsoleTarget"><value>目标：{0}    序列号：{1}</value></data><data name="RunCommand"><value>运行</value></data><data name="AddTimestamps"><value>添加时间戳</value></data><data name="CancelCommand"><value>取消命令</value></data><data name="Clear"><value>清除</value></data><data name="CopyOutput"><value>复制输出</value></data><data name="CommandCancelled"><value>命令已取消。</value></data>
 <data name="ScrcpyAndroidUnsupported"><value>此设备使用 Android API {0}。官方 scrcpy 运行时要求 API {1}（Android 5.0）或更高版本。</value></data>
+  <data name="GroupActions" xml:space="preserve"><value>批量操作</value></data>
+  <data name="GroupTargetsFormat" xml:space="preserve"><value>已选择设备：{0}</value></data>
+  <data name="GroupSuccess" xml:space="preserve"><value>{0}：已完成</value></data>
+  <data name="GroupFailed" xml:space="preserve"><value>{0}：失败 — {1}</value></data>
+  <data name="GroupRebootTitle" xml:space="preserve"><value>重启所选设备</value></data>
+  <data name="GroupRebootConfirm" xml:space="preserve"><value>重启所选的 {0} 台设备？</value></data>
 </root>

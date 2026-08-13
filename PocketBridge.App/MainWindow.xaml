@@ -64,7 +64,7 @@
                             <DataTemplate>
                                 <Border Padding="14" Background="Transparent" CornerRadius="12" ClipToBounds="True" AllowDrop="True" Drop="DeviceCard_Drop">
                                     <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <Border Width="34" Height="48" CornerRadius="7" BorderBrush="{StaticResource TextMutedBrush}" BorderThickness="2" VerticalAlignment="Top"><Ellipse Width="4" Height="4" Fill="{StaticResource TextMutedBrush}" VerticalAlignment="Top" Margin="0,4,0,0" /></Border>
                                         <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                             <TextBlock Text="{Binding FriendlyName}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -72,6 +72,7 @@
                                             <StackPanel Orientation="Horizontal"><Border Padding="7,2" CornerRadius="7" Background="#222B3D" Margin="0,0,7,0"><TextBlock Text="{Binding ConnectionLabel}" FontSize="11" /></Border><Border Padding="7,2" CornerRadius="7" Background="#222B3D"><TextBlock Text="{Binding StateLabel}" Foreground="{Binding StateBrush}" FontSize="11" FontWeight="SemiBold" /></Border></StackPanel>
                                             <TextBlock Margin="0,8,0,0" Foreground="{StaticResource SuccessBrush}" FontSize="11" Visibility="{Binding IsSessionRunning, Converter={StaticResource BooleanToVisibilityConverter}}"><Run Text="● " /><Run Text="{loc:Loc SessionActive}" /></TextBlock>
                                         </StackPanel>
+                                        <CheckBox Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Top" IsChecked="{Binding IsGroupSelected}" Checked="GroupTarget_Changed" Unchecked="GroupTarget_Changed" ToolTip="{loc:Loc GroupActions}" AutomationProperties.Name="{loc:Loc GroupActions}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -151,12 +152,29 @@
                         </Grid>
                     </Grid>
                     <Grid Visibility="{Binding IsMultiView, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <Grid>
                             <StackPanel><TextBlock Text="{loc:Loc MultiView}" FontSize="22" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc MultiViewHelp}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}" /></StackPanel>
                             <Button HorizontalAlignment="Right" Style="{StaticResource BaseButton}" Command="{Binding ShowSingleViewCommand}" Content="{loc:Loc SingleDevice}" />
                         </Grid>
-                        <ItemsControl Grid.Row="2" ItemsSource="{Binding ActiveEmbeddedSessions}">
+                        <Border Grid.Row="2" Padding="10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Margin="0,0,12,0" Text="{Binding GroupTargetCountText}" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupBackCommand}" Content="{loc:Loc Back}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupHomeCommand}" Content="{loc:Loc Home}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupRecentsCommand}" Content="{loc:Loc Recents}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupVolumeDownCommand}" Content="{loc:Loc VolumeDown}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupVolumeUpCommand}" Content="{loc:Loc VolumeUp}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupPowerCommand}" Content="{loc:Loc Power}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupScreenshotCommand}" Content="{loc:Loc Screenshot}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupSendFilesCommand}" Content="{loc:Loc TransferFiles}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Margin="0,0,6,0" Command="{Binding GroupInstallApkCommand}" Content="{loc:Loc InstallApk}" />
+                                    <Button Style="{StaticResource BaseButton}" MinHeight="34" Padding="10,4" Command="{Binding GroupRebootCommand}" Content="{loc:Loc Reboot}" />
+                                </WrapPanel>
+                            </DockPanel>
+                        </Border>
+                        <ItemsControl Grid.Row="4" ItemsSource="{Binding ActiveEmbeddedSessions}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><UniformGrid Columns="{Binding DataContext.MultiViewColumns, RelativeSource={RelativeSource AncestorType=Window}}" Rows="{Binding DataContext.MultiViewRows, RelativeSource={RelativeSource AncestorType=Window}}" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>

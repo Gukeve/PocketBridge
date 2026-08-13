@@ -7,6 +7,7 @@ namespace PocketBridge.App.ViewModels;
 public sealed class DeviceItemViewModel : ObservableObject
 {
     private bool _isSessionRunning;
+    private bool _isGroupSelected;
     private DeviceProfile _profile;
     public DeviceItemViewModel(AndroidDevice device, DeviceProfile profile, bool isSessionRunning) { Device = device; _profile = profile; _isSessionRunning = isSessionRunning; }
     public AndroidDevice Device { get; private set; }
@@ -32,6 +33,11 @@ public sealed class DeviceItemViewModel : ObservableObject
     {
         get => _isSessionRunning;
         set { if (SetProperty(ref _isSessionRunning, value)) OnPropertyChanged(nameof(StateLabel)); }
+    }
+    public bool IsGroupSelected
+    {
+        get => _isGroupSelected;
+        set => SetProperty(ref _isGroupSelected, value);
     }
 
     public void Update(AndroidDevice device, DeviceProfile profile, bool isSessionRunning)

@@ -43,7 +43,7 @@ public partial class App : Application
             settings,
             new DeviceInformationService(adb),
             new AdbConsoleService(locator, settings));
-        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings);
+        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb));
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();

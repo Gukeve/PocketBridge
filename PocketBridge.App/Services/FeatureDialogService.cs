@@ -15,6 +15,9 @@ public interface IFeatureDialogService
     void ShowFiles(AndroidDevice device);
     Task<string?> CaptureScreenshotAsync(AndroidDevice device);
     Task<int> QueueDroppedFilesAsync(AndroidDevice device, IReadOnlyList<string> files);
+    Task<IReadOnlyList<GroupActionResult>> CaptureScreenshotsAsync(IReadOnlyList<AndroidDevice> devices);
+    Task<IReadOnlyList<GroupActionResult>> QueueFilesForDevicesAsync(IReadOnlyList<AndroidDevice> devices);
+    Task<IReadOnlyList<GroupActionResult>> InstallApkForDevicesAsync(IReadOnlyList<AndroidDevice> devices);
     void ShowTransfers();
     void ShowApplications(AndroidDevice device);
     void ShowMediaResult(string filePath, bool canCopy);
@@ -93,6 +96,63 @@ public sealed class FeatureDialogService : IFeatureDialogService
         var count = _transfers.Enqueue(requests).Count;
         if (count > 0) ShowTransfers();
         return Task.FromResult(count);
+    }
+
+    public async Task<IReadOnlyList<GroupActionResult>> CaptureScreenshotsAsync(IReadOnlyList<AndroidDevice> devices)
+    {
+        var results = new List<GroupActionResult>();
+        foreach (var device in devices)
+        {
+            try
+            {
+                var settings = _settings.Load();
+                var folder = string.IsNullOrWhiteSpace(settings.ScreenshotFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) : settings.ScreenshotFolder;
+                Directory.CreateDirectory(folder!);
+                var template = string.IsNullOrWhiteSpace(settings.ScreenshotFilenameFormat) ? "PocketBridge_<device>_yyyy-MM-dd_HH-mm-ss" : settings.ScreenshotFilenameFormat;
+                var path = Path.Combine(folder!, ScreenshotFilenameFormatter.Format(template, device.FriendlyName, DateTime.Now) + ".png");
+                await _screenshots.CaptureAsync(device.Serial, path);
+                results.Add(new GroupActionResult(device.Serial, device.FriendlyName, true, null));
+            }
+            catch (Exception exception) { results.Add(new GroupActionResult(device.Serial, device.FriendlyName, false, exception.Message)); }
+        }
+        return results;
+    }
+
+    public Task<IReadOnlyList<GroupActionResult>> QueueFilesForDevicesAsync(IReadOnlyList<AndroidDevice> devices)
+    {
+        var picker = new OpenFileDialog { Title = LocalizationService.Current["TransferFiles"], Multiselect = true, CheckFileExists = true };
+        if (picker.ShowDialog() != true) return Task.FromResult<IReadOnlyList<GroupActionResult>>(Array.Empty<GroupActionResult>());
+        var prompt = new TextPromptWindow(LocalizationService.Current.Format("TransferFilesPrompt", picker.FileNames.Length, devices.Count), "/sdcard/Download/") { Owner = Application.Current.MainWindow };
+        if (prompt.ShowDialog() != true) return Task.FromResult<IReadOnlyList<GroupActionResult>>(Array.Empty<GroupActionResult>());
+        var destination = NormalizeDestination(prompt.Value);
+        var results = new List<GroupActionResult>();
+        foreach (var device in devices)
+        {
+            var requests = picker.FileNames.Select(path => new FileTransferRequest(path, $"{destination}{Path.GetFileName(path)}", device.Serial, FileTransferOperation.Upload));
+            var count = _transfers.Enqueue(requests).Count;
+            results.Add(new GroupActionResult(device.Serial, device.FriendlyName, count == picker.FileNames.Length, count == picker.FileNames.Length ? null : "Some files were not queued."));
+        }
+        if (results.Count > 0) ShowTransfers();
+        return Task.FromResult<IReadOnlyList<GroupActionResult>>(results);
+    }
+
+    public async Task<IReadOnlyList<GroupActionResult>> InstallApkForDevicesAsync(IReadOnlyList<AndroidDevice> devices)
+    {
+        var picker = new OpenFileDialog { Title = LocalizationService.Current["ChooseApk"], Filter = "Android packages (*.apk)|*.apk", Multiselect = false };
+        if (picker.ShowDialog() != true) return Array.Empty<GroupActionResult>();
+        if (!_confirmation.Confirm(LocalizationService.Current["InstallApk"], LocalizationService.Current.Format("ConfirmInstallCount", devices.Count, "selected devices"))) return Array.Empty<GroupActionResult>();
+        var results = new List<GroupActionResult>();
+        foreach (var device in devices)
+        {
+            try
+            {
+                var result = await _apkInstaller.InstallAsync(device.Serial, picker.FileName);
+                var success = result.IsSuccess && result.StandardOutput.Contains("Success", StringComparison.OrdinalIgnoreCase);
+                results.Add(new GroupActionResult(device.Serial, device.FriendlyName, success, success ? null : (string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput.Trim() : result.StandardError.Trim())));
+            }
+            catch (Exception exception) { results.Add(new GroupActionResult(device.Serial, device.FriendlyName, false, exception.Message)); }
+        }
+        return results;
     }
 
     public void ShowTransfers()

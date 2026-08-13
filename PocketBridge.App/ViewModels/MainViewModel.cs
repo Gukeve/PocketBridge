@@ -25,6 +25,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IConfirmationService _confirmation;
     private readonly IFeatureDialogService _featureDialogs;
     private readonly IRecordingService _recordings;
+    private readonly IGroupActionService _groupActions;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
@@ -52,7 +53,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IDeviceProfileDialogService profileDialog,
         IConfirmationService confirmation,
         IFeatureDialogService featureDialogs,
-        IRecordingService recordings)
+        IRecordingService recordings,
+        IGroupActionService groupActions)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -66,6 +68,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _confirmation = confirmation;
         _featureDialogs = featureDialogs;
         _recordings = recordings;
+        _groupActions = groupActions;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
@@ -98,6 +101,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OpenAdbConsoleCommand = new RelayCommand(OpenAdbConsole, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
+        GroupHomeCommand = GroupCommand(GroupAction.Home);
+        GroupBackCommand = GroupCommand(GroupAction.Back);
+        GroupRecentsCommand = GroupCommand(GroupAction.Recents);
+        GroupVolumeUpCommand = GroupCommand(GroupAction.VolumeUp);
+        GroupVolumeDownCommand = GroupCommand(GroupAction.VolumeDown);
+        GroupPowerCommand = GroupCommand(GroupAction.Power);
+        GroupRebootCommand = new AsyncRelayCommand(GroupRebootAsync, CanRunGroupAction);
+        GroupScreenshotCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.CaptureScreenshotsAsync), CanRunGroupAction);
+        GroupSendFilesCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.QueueFilesForDevicesAsync), CanRunGroupAction);
+        GroupInstallApkCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.InstallApkForDevicesAsync), CanRunGroupAction);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
         _clipboardTimer.Tick += ClipboardTimer_Tick;
         _clipboardTimer.Start();
@@ -136,6 +149,18 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand OpenAdbConsoleCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
+    public AsyncRelayCommand GroupHomeCommand { get; }
+    public AsyncRelayCommand GroupBackCommand { get; }
+    public AsyncRelayCommand GroupScreenshotCommand { get; }
+    public AsyncRelayCommand GroupSendFilesCommand { get; }
+    public AsyncRelayCommand GroupInstallApkCommand { get; }
+    public AsyncRelayCommand GroupRecentsCommand { get; }
+    public AsyncRelayCommand GroupVolumeUpCommand { get; }
+    public AsyncRelayCommand GroupVolumeDownCommand { get; }
+    public AsyncRelayCommand GroupPowerCommand { get; }
+    public AsyncRelayCommand GroupRebootCommand { get; }
+    public int GroupTargetCount => Devices.Count(device => device.IsGroupSelected && device.Device.IsReady);
+    public string GroupTargetCountText => LocalizationService.Current.Format("GroupTargetsFormat", GroupTargetCount);
 
     public DeviceItemViewModel? SelectedDevice
     {
@@ -568,6 +593,58 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private void ShowSingleView() => IsMultiView = false;
 
+    public void GroupSelectionChanged()
+    {
+        OnPropertyChanged(nameof(GroupTargetCount));
+        OnPropertyChanged(nameof(GroupTargetCountText));
+        NotifyCommands();
+    }
+
+    private AsyncRelayCommand GroupCommand(GroupAction action) => new(() => ExecuteGroupActionAsync(action), CanRunGroupAction);
+
+    private bool CanRunGroupAction() => IsMultiView && GroupTargetCount > 0 && !IsBusy;
+
+    private async Task GroupRebootAsync()
+    {
+        if (!_confirmation.Confirm(LocalizationService.Current["GroupRebootTitle"], LocalizationService.Current.Format("GroupRebootConfirm", GroupTargetCount))) return;
+        await ExecuteGroupActionAsync(GroupAction.Reboot);
+    }
+
+    private async Task ExecuteGroupActionAsync(GroupAction action)
+    {
+        var targets = Devices.Where(device => device.IsGroupSelected && device.Device.IsReady)
+            .Select(device => new GroupActionTarget(device.Serial, device.FriendlyName)).ToArray();
+        if (targets.Length == 0) return;
+        IsBusy = true;
+        try
+        {
+            var results = await _groupActions.ExecuteAsync(action, targets, _lifetime.Token);
+            ShowGroupResults(results);
+        }
+        finally { IsBusy = false; }
+    }
+
+    private async Task ExecuteGroupFeatureAsync(Func<IReadOnlyList<AndroidDevice>, Task<IReadOnlyList<GroupActionResult>>> operation)
+    {
+        var devices = Devices.Where(device => device.IsGroupSelected && device.Device.IsReady).Select(device => device.Device).ToArray();
+        if (devices.Length == 0) return;
+        IsBusy = true;
+        try
+        {
+            var results = await operation(devices);
+            if (results.Count > 0) ShowGroupResults(results);
+        }
+        finally { IsBusy = false; }
+    }
+
+    private void ShowGroupResults(IReadOnlyList<GroupActionResult> results)
+    {
+        var lines = results.Select(result => result.Success
+            ? LocalizationService.Current.Format("GroupSuccess", result.Alias)
+            : LocalizationService.Current.Format("GroupFailed", result.Alias, result.Error ?? LocalizationService.Current["StatusCommandFailed"]));
+        SetStatus(string.Join(Environment.NewLine, lines), results.All(result => result.Success) ? StatusKind.Success : StatusKind.Warning);
+    }
+
     private async Task StartMultiViewAsync()
     {
         IsBusy = true;
@@ -696,6 +773,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(DeviceCountText));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(ShowSelectionPrompt));
+        OnPropertyChanged(nameof(GroupTargetCount));
+        OnPropertyChanged(nameof(GroupTargetCountText));
     }
 
     private string? FindTool(string executableName) => _locator.Find(executableName, _settings.Load().ToolsDirectory);
@@ -721,6 +800,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
         SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged();
+        GroupHomeCommand.NotifyCanExecuteChanged(); GroupBackCommand.NotifyCanExecuteChanged(); GroupRecentsCommand.NotifyCanExecuteChanged(); GroupVolumeUpCommand.NotifyCanExecuteChanged(); GroupVolumeDownCommand.NotifyCanExecuteChanged(); GroupPowerCommand.NotifyCanExecuteChanged(); GroupRebootCommand.NotifyCanExecuteChanged(); GroupScreenshotCommand.NotifyCanExecuteChanged(); GroupSendFilesCommand.NotifyCanExecuteChanged(); GroupInstallApkCommand.NotifyCanExecuteChanged();
     }
 
     private void SetStatus(string message, StatusKind kind)
