@@ -93,12 +93,12 @@ Acceptance: validated options generate correct external arguments and embedded s
 - Explicit opt-in Multi View group selection and serial-scoped Home/Back/Recents/volume/power/screenshot/file/APK/restart actions, with per-device partial-failure results.
 - Configurable, persisted shortcuts with Global/SelectedDevice/EmbeddedView/MultiView scopes, conflict replacement and default reset.
 - Input mapping foundation separates UI, Android key, future touch and future gamepad actions; the visual mapper remains P3.
-- Version-keyed asynchronous app-icon cache core with package/device/manual invalidation. Android icon extraction and non-blocking Application Manager binding remain open.
-- Bounded in-process transfer history (500 records) with active/history views, metadata, retry, reveal, copy, clear and device text filter. Durable history and a dedicated status selector remain open.
+- Version-keyed application-icon cache with real serial-scoped APK retrieval, immediate placeholders, bounded background loading, progressive UI binding and uninstall/update/manual-refresh invalidation.
+- Atomically persisted transfer history bounded to 500 records, corrupt-file quarantine, active/history views, metadata, retry, reveal, destination copy, clear, device text and status filters.
 - Audio capability detection based on runtime and Android API, plus independent official-scrcpy audio forwarding with cleanup and no custom codec.
-- Recording controls for MP4/MKV, H.264/H.265/AV1, optional audio, max size, FPS and bitrate.
+- Recording controls for MP4/MKV, optional audio, max size, FPS and bitrate. Video codec choices come from official scrcpy `--list-encoders` for the selected serial and unsupported combinations are rejected before launch.
 
-P2 automated code status is PARTIAL until the remaining icon/UI and transfer-history items above are complete. Audio and recording capability combinations are not hardware-accepted by source/build evidence.
+P2 code status is COMPLETE. P2 hardware acceptance remains PARTIAL because no physical device was connected for the 2026-08-14 audio, codec and recording matrix; see `docs/P2_HARDWARE_ACCEPTANCE.md`.
 
 ## P3 — experimental
 
@@ -135,7 +135,7 @@ The recording implementation deliberately uses a separate official scrcpy proces
 
 P1 code complete. P1 hardware acceptance PARTIAL; the remaining manual cases stay listed in `docs/P1_HARDWARE_ACCEPTANCE.md`.
 
-P2 is in progress as described above. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model, and has not been started.
+P2 code is complete as described above. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model, and has not been started.
 
 ## Verification matrix
 
