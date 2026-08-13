@@ -12,6 +12,7 @@ public interface IFileTransferQueueService : IAsyncDisposable
 {
     event EventHandler? Changed;
     IReadOnlyList<FileTransferSnapshot> Items { get; }
+    string? DiagnosticMessage { get; }
     IReadOnlyList<Guid> Enqueue(IEnumerable<FileTransferRequest> requests);
     void Cancel(Guid id);
     bool Retry(Guid id);

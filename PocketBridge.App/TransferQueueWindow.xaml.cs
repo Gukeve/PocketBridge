@@ -22,6 +22,9 @@ public partial class TransferQueueWindow : Window
         InitializeComponent();
         ActiveList.ItemsSource = _active;
         HistoryList.ItemsSource = _history;
+        StatusFilterBox.ItemsSource = new[] { new StatusOption(null, LocalizationService.Current["AllStatuses"]), new StatusOption(FileTransferState.Completed, LocalizationService.Current["TransferCompleted"]), new StatusOption(FileTransferState.Failed, LocalizationService.Current["TransferFailed"]), new StatusOption(FileTransferState.Cancelled, LocalizationService.Current["TransferCancelled"]) };
+        StatusFilterBox.DisplayMemberPath = nameof(StatusOption.Label); StatusFilterBox.SelectedIndex = 0;
+        DiagnosticText.Text = _queue.DiagnosticMessage ?? string.Empty;
         _queue.Changed += Queue_Changed;
         Closed += (_, _) => _queue.Changed -= Queue_Changed;
         Refresh();
@@ -34,7 +37,8 @@ public partial class TransferQueueWindow : Window
         var selected = Selected?.Id;
         var query = FilterBox.Text.Trim();
         _active.Clear(); _history.Clear();
-        foreach (var item in _queue.Items.Where(item => query.Length == 0 || item.Source.Contains(query, StringComparison.OrdinalIgnoreCase) || item.Destination.Contains(query, StringComparison.OrdinalIgnoreCase) || item.DeviceAlias.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        var status = (StatusFilterBox.SelectedItem as StatusOption)?.State;
+        foreach (var item in _queue.Items.Where(item => TransferHistoryFilter.Matches(item, query, status)))
             (item.State is FileTransferState.Waiting or FileTransferState.Transferring ? _active : _history).Add(new Row(item));
         if (selected is { } id)
         {
@@ -48,16 +52,17 @@ public partial class TransferQueueWindow : Window
     private void ClearCompleted_Click(object sender, RoutedEventArgs e) => _queue.ClearCompleted();
     private void ClearHistory_Click(object sender, RoutedEventArgs e) => _queue.ClearHistory();
     private void Filter_TextChanged(object sender, TextChangedEventArgs e) { if (IsInitialized) Refresh(); }
+    private void StatusFilter_Changed(object sender, SelectionChangedEventArgs e) { if (IsInitialized) Refresh(); }
     private void TransferTabs_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
     private void Reveal_Click(object sender, RoutedEventArgs e) { if (Selected is { } row && File.Exists(row.Source)) Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{row.Source}\"") { UseShellExecute = true }); }
-    private void CopyDetails_Click(object sender, RoutedEventArgs e) { if (Selected is { } row) Clipboard.SetText(row.CopyText); }
+    private void CopyDestination_Click(object sender, RoutedEventArgs e) { if (Selected is { } row) Clipboard.SetText(row.Destination); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     private sealed record Row
     {
         public Row(FileTransferSnapshot item)
         {
-            Id = item.Id; Source = item.Source; FileName = Path.GetFileName(item.Source);
+            Id = item.Id; Source = item.Source; Destination = item.Destination; FileName = Path.GetFileName(item.Source);
             TargetLine = $"{item.DeviceAlias} ({Redact(item.Serial)})  →  {item.Destination}";
             DetailsLine = $"{item.Timestamp.LocalDateTime:g} · {FormatBytes(item.Bytes)} · {(item.Duration is null ? "—" : $"{item.Duration.Value.TotalSeconds:0.0}s")} · {item.Direction}";
             ProgressPercent = item.Progress * 100; ProgressLabel = $"{ProgressPercent:0}%"; Error = item.Error;
@@ -67,6 +72,7 @@ public partial class TransferQueueWindow : Window
         }
         public Guid Id { get; }
         public string Source { get; }
+        public string Destination { get; }
         public string FileName { get; }
         public string TargetLine { get; }
         public string DetailsLine { get; }
@@ -80,4 +86,5 @@ public partial class TransferQueueWindow : Window
         private static string Redact(string serial) => serial.Length <= 4 ? "••••" : $"••••{serial[^4..]}";
         private static string FormatBytes(long bytes) => bytes < 1024 ? $"{bytes} B" : bytes < 1024 * 1024 ? $"{bytes / 1024d:0.0} KB" : $"{bytes / 1024d / 1024d:0.0} MB";
     }
+    private sealed record StatusOption(FileTransferState? State, string Label);
 }
