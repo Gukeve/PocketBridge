@@ -13,6 +13,7 @@ public partial class App : Application
 {
     private IFileTransferQueueService? _transfers;
     private IRecordingService? _recordings;
+    private IAudioForwardingService? _audio;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -26,6 +27,7 @@ public partial class App : Application
         _transfers = transfers;
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
         IRecordingService recordings = new RecordingService(locator, settings);
+        IAudioForwardingService audio = new AudioForwardingService(adb, locator, settings);
         _recordings = recordings;
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
@@ -43,7 +45,8 @@ public partial class App : Application
             settings,
             new DeviceInformationService(adb),
             new AdbConsoleService(locator, settings));
-        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb));
+        var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb), audio);
+        _audio = audio;
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();
@@ -54,6 +57,7 @@ public partial class App : Application
     {
         _transfers?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _recordings?.Dispose();
+        _audio?.Dispose();
         base.OnExit(e);
     }
 }

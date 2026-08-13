@@ -11,7 +11,7 @@ public sealed class RecordingService(IExecutableLocator locator, IAppSettingsSer
     public event EventHandler<RecordingSession>? Changed;
     public RecordingSession? Get(string serial) => _active.TryGetValue(serial, out var holder) ? holder.Session : null;
 
-    public Task<RecordingSession> StartAsync(AndroidDevice device, string filePath)
+    public Task<RecordingSession> StartAsync(AndroidDevice device, string filePath, RecordingOptions? options = null)
     {
         if (!device.IsReady) throw new InvalidOperationException("The selected device is not ready.");
         if (_active.ContainsKey(device.Serial)) throw new InvalidOperationException("This device is already being recorded.");
@@ -21,6 +21,14 @@ public sealed class RecordingService(IExecutableLocator locator, IAppSettingsSer
         info.ArgumentList.Add($"--serial={device.Serial}");
         info.ArgumentList.Add($"--record={Path.GetFullPath(filePath)}");
         info.ArgumentList.Add("--no-playback");
+        if (options is not null)
+        {
+            info.ArgumentList.Add($"--video-codec={options.VideoCodec}");
+            info.ArgumentList.Add(options.IncludeAudio ? "--audio" : "--no-audio");
+            if (options.MaxSize is { } size) info.ArgumentList.Add($"--max-size={size}");
+            if (options.MaxFps is { } fps) info.ArgumentList.Add($"--max-fps={fps}");
+            if (options.BitrateMbps is { } bitrate) info.ArgumentList.Add($"--video-bit-rate={bitrate}M");
+        }
         var adb = locator.Find("adb.exe", settings.Load().ToolsDirectory);
         if (adb is not null) info.Environment["ADB"] = adb;
         var process = new Process { StartInfo = info, EnableRaisingEvents = true };

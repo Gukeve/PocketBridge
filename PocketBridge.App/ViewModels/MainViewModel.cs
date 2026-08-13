@@ -26,6 +26,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IFeatureDialogService _featureDialogs;
     private readonly IRecordingService _recordings;
     private readonly IGroupActionService _groupActions;
+    private readonly IAudioForwardingService _audio;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
@@ -40,6 +41,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool _adbAvailable;
     private string _statusMessage = LocalizationService.Current["StatusRefreshing"];
     private StatusKind _statusKind = StatusKind.Neutral;
+    private string _audioStatus = "Audio: not checked";
 
     public MainViewModel(
         IAdbService adb,
@@ -54,7 +56,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IConfirmationService confirmation,
         IFeatureDialogService featureDialogs,
         IRecordingService recordings,
-        IGroupActionService groupActions)
+        IGroupActionService groupActions,
+        IAudioForwardingService audio)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -69,6 +72,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _featureDialogs = featureDialogs;
         _recordings = recordings;
         _groupActions = groupActions;
+        _audio = audio;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
@@ -111,6 +115,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         GroupScreenshotCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.CaptureScreenshotsAsync), CanRunGroupAction);
         GroupSendFilesCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.QueueFilesForDevicesAsync), CanRunGroupAction);
         GroupInstallApkCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.InstallApkForDevicesAsync), CanRunGroupAction);
+        ToggleAudioCommand = new AsyncRelayCommand(ToggleAudioAsync, CanControl);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
         _clipboardTimer.Tick += ClipboardTimer_Tick;
         _clipboardTimer.Start();
@@ -154,6 +159,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public AsyncRelayCommand GroupScreenshotCommand { get; }
     public AsyncRelayCommand GroupSendFilesCommand { get; }
     public AsyncRelayCommand GroupInstallApkCommand { get; }
+    public AsyncRelayCommand ToggleAudioCommand { get; }
     public AsyncRelayCommand GroupRecentsCommand { get; }
     public AsyncRelayCommand GroupVolumeUpCommand { get; }
     public AsyncRelayCommand GroupVolumeDownCommand { get; }
@@ -248,6 +254,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string RecordingText => IsRecording
         ? $"● REC {(DateTimeOffset.Now - _recordings.Get(SelectedDevice!.Serial)!.StartedAt):hh\\:mm\\:ss}"
         : LocalizationService.Current["Record"];
+
+    public string AudioStatus { get => _audioStatus; private set => SetProperty(ref _audioStatus, value); }
+    public string AudioButtonText => SelectedDevice is { } selected && _audio.IsRunning(selected.Serial) ? LocalizationService.Current["StopAudio"] : LocalizationService.Current["StartAudio"];
 
     public async Task InitializeAsync()
     {
@@ -485,7 +494,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 var folder = string.IsNullOrWhiteSpace(settings.RecordingFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) : settings.RecordingFolder;
                 var safeDevice = SanitizeFilename(selected.FriendlyName);
                 var path = Path.Combine(folder!, $"PocketBridge_{safeDevice}_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.{format}");
-                await _recordings.StartAsync(selected.Device, path);
+                await _recordings.StartAsync(selected.Device, path, new RecordingOptions(format, settings.RecordingVideoCodec, settings.RecordingIncludeAudio, settings.RecordingMaxSize, settings.RecordingMaxFps, settings.RecordingBitrateMbps));
             }
         }
         catch (Exception exception) { SetStatus(LocalizationService.Current.Format("RecordingFailed", exception.Message), StatusKind.Error); }
@@ -495,6 +504,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         void Update() { OnPropertyChanged(nameof(IsRecording)); OnPropertyChanged(nameof(RecordingText)); ToggleRecordingCommand.NotifyCanExecuteChanged(); }
         if (_uiContext is null) Update(); else _uiContext.Post(_ => Update(), null);
+    }
+
+    private async Task ToggleAudioAsync()
+    {
+        if (SelectedDevice is not { } selected) return;
+        try
+        {
+            if (_audio.IsRunning(selected.Serial)) await _audio.StopAsync(selected.Serial); else await _audio.StartAsync(selected.Device);
+            var capability = await _audio.DetectAsync(selected.Serial);
+            AudioStatus = capability.IsSupported ? $"Audio: {capability.Codec}, API {capability.AndroidApi}" : $"Audio unavailable: {capability.Reason}";
+        }
+        catch (Exception exception) { AudioStatus = $"Audio unavailable: {exception.Message}"; }
+        OnPropertyChanged(nameof(AudioButtonText));
     }
 
     private static string SanitizeFilename(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
@@ -827,7 +849,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); ToggleAudioCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged();
         GroupHomeCommand.NotifyCanExecuteChanged(); GroupBackCommand.NotifyCanExecuteChanged(); GroupRecentsCommand.NotifyCanExecuteChanged(); GroupVolumeUpCommand.NotifyCanExecuteChanged(); GroupVolumeDownCommand.NotifyCanExecuteChanged(); GroupPowerCommand.NotifyCanExecuteChanged(); GroupRebootCommand.NotifyCanExecuteChanged(); GroupScreenshotCommand.NotifyCanExecuteChanged(); GroupSendFilesCommand.NotifyCanExecuteChanged(); GroupInstallApkCommand.NotifyCanExecuteChanged();
     }
 

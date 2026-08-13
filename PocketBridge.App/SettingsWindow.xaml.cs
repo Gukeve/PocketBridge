@@ -36,6 +36,11 @@ public partial class SettingsWindow : Window
         ScreenshotFolderBox.Text = settings.ScreenshotFolder ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
         ScreenshotFormatBox.Text = settings.ScreenshotFilenameFormat;
         RecordingFormatBox.SelectedIndex = settings.RecordingFormat.Equals("mkv", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        RecordingCodecBox.SelectedIndex = settings.RecordingVideoCodec switch { "h265" => 1, "av1" => 2, _ => 0 };
+        RecordingAudioBox.IsChecked = settings.RecordingIncludeAudio;
+        RecordingSizeBox.Text = settings.RecordingMaxSize?.ToString() ?? string.Empty;
+        RecordingFpsBox.Text = settings.RecordingMaxFps?.ToString() ?? string.Empty;
+        RecordingBitrateBox.Text = settings.RecordingBitrateMbps?.ToString() ?? string.Empty;
         VersionText.Text = LocalizationService.Current.Format("VersionFormat", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0");
         UpdateComponentStatus();
     }
@@ -65,12 +70,14 @@ public partial class SettingsWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         var format = (RecordingFormatBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "mp4";
+        var codec = (RecordingCodecBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "h264";
         var requested = ShortcutItems.Select(item => item.ToBinding()).Where(item => !string.IsNullOrWhiteSpace(item.Gesture)).ToArray();
         var resolved = ShortcutBindingResolver.ReplaceConflicts(requested);
         if (resolved.Count != requested.Length && MessageBox.Show(LocalizationService.Current["ShortcutConflictReplace"], LocalizationService.Current["Shortcuts"], MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage, RecordingFolder = RecordingFolderBox.Text.Trim(), RecordingFormat = format, ScreenshotFolder = ScreenshotFolderBox.Text.Trim(), ScreenshotFilenameFormat = ScreenshotFormatBox.Text.Trim(), ShortcutBindings = resolved }; DialogResult = true;
+        Result = _initialSettings with { ToolsDirectory = _runtimeTools.DefaultToolsDirectory, Language = LanguageBox.SelectedValue as string ?? _initialLanguage, RecordingFolder = RecordingFolderBox.Text.Trim(), RecordingFormat = format, RecordingVideoCodec = codec, RecordingIncludeAudio = RecordingAudioBox.IsChecked == true, RecordingMaxSize = ParseOptional(RecordingSizeBox.Text), RecordingMaxFps = ParseOptional(RecordingFpsBox.Text), RecordingBitrateMbps = ParseOptional(RecordingBitrateBox.Text), ScreenshotFolder = ScreenshotFolderBox.Text.Trim(), ScreenshotFilenameFormat = ScreenshotFormatBox.Text.Trim(), ShortcutBindings = resolved }; DialogResult = true;
     }
     private void ResetShortcuts_Click(object sender, RoutedEventArgs e) { ShortcutItems.Clear(); foreach (var item in ShortcutBinding.Defaults.Select(ShortcutEditorItem.From)) ShortcutItems.Add(item); }
+    private static int? ParseOptional(string value) => int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
     private void BrowseRecording_Click(object sender, RoutedEventArgs e) => BrowseFolder(RecordingFolderBox);
     private void BrowseScreenshot_Click(object sender, RoutedEventArgs e) => BrowseFolder(ScreenshotFolderBox);
     private void BrowseFolder(TextBox target) { var picker = new Microsoft.Win32.OpenFolderDialog { InitialDirectory = target.Text }; if (picker.ShowDialog(this) == true) target.Text = picker.FolderName; }

@@ -33,6 +33,7 @@ var tests = new (string Name, Action Run)[]
     ,("Group actions remain serial scoped and tolerate partial failure", GroupActionsAreIsolated)
     ,("Shortcut conflict replacement is scope aware", ShortcutConflictReplacementIsScopeAware)
     ,("Shortcut bindings persist in settings", ShortcutBindingsPersist)
+    ,("App icon cache is version keyed and invalidatable", AppIconCacheIsVersionKeyed)
 };
 
 var failed = 0;
@@ -409,6 +410,19 @@ static void ShortcutBindingsPersist()
         Equal(expected[0], actual);
     }
     finally { if (File.Exists(path)) File.Delete(path); }
+}
+
+static void AppIconCacheIsVersionKeyed()
+{
+    var cache = new AppIconCache(); var loads = 0;
+    Task<byte[]?> Load(CancellationToken _) { loads++; return Task.FromResult<byte[]?>(new byte[] { (byte)loads }); }
+    var first = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 1), Load).GetAwaiter().GetResult();
+    var repeated = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 1), Load).GetAwaiter().GetResult();
+    var updated = cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 2), Load).GetAwaiter().GetResult();
+    Equal(2, loads); Equal(first![0], repeated![0]); True(updated![0] != first[0], "A changed version must use a new cache entry.");
+    cache.Invalidate("S", "com.example.app");
+    cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 2), Load).GetAwaiter().GetResult();
+    Equal(3, loads);
 }
 
 static void True(bool condition, string message)
