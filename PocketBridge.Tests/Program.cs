@@ -34,6 +34,7 @@ var tests = new (string Name, Action Run)[]
     ,("Shortcut conflict replacement is scope aware", ShortcutConflictReplacementIsScopeAware)
     ,("Shortcut bindings persist in settings", ShortcutBindingsPersist)
     ,("App icon cache is version keyed and invalidatable", AppIconCacheIsVersionKeyed)
+    ,("Audio capability requires runtime and Android 11", AudioCapabilityIsDetected)
 };
 
 var failed = 0;
@@ -423,6 +424,14 @@ static void AppIconCacheIsVersionKeyed()
     cache.Invalidate("S", "com.example.app");
     cache.GetAsync(new AppIconCacheKey("S", "com.example.app", 2), Load).GetAwaiter().GetResult();
     Equal(3, loads);
+}
+
+static void AudioCapabilityIsDetected()
+{
+    True(!AudioCapabilityDetector.Evaluate(35, false).IsSupported, "Missing runtime must disable audio.");
+    True(!AudioCapabilityDetector.Evaluate(29, true).IsSupported, "Android 10 must not advertise audio capture.");
+    var supported = AudioCapabilityDetector.Evaluate(30, true);
+    True(supported.IsSupported && supported.Codec == "opus", "Android 11 with runtime should advertise the selected codec.");
 }
 
 static void True(bool condition, string message)

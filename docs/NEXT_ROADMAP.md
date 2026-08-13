@@ -88,14 +88,17 @@ Acceptance: validated options generate correct external arguments and embedded s
 - Friendly name, manufacturer, model, Android/SDK, serial, connection/IP, resolution, battery, storage, ABI.
 - Compact dedicated page; unknown values remain explicit.
 
-## P2 — additional
+## P2 — current implementation
 
-- Group actions with prominent target count and opt-in broadcast.
-- Rotation/orientation controls and multiple Android displays.
-- Transfer history and richer cancellation/retry.
-- Configurable shortcuts UI.
-- App icons if retrieval can be bounded and cached safely.
-- Audio controls and recording mux options after capability work.
+- Explicit opt-in Multi View group selection and serial-scoped Home/Back/Recents/volume/power/screenshot/file/APK/restart actions, with per-device partial-failure results.
+- Configurable, persisted shortcuts with Global/SelectedDevice/EmbeddedView/MultiView scopes, conflict replacement and default reset.
+- Input mapping foundation separates UI, Android key, future touch and future gamepad actions; the visual mapper remains P3.
+- Version-keyed asynchronous app-icon cache core with package/device/manual invalidation. Android icon extraction and non-blocking Application Manager binding remain open.
+- Bounded in-process transfer history (500 records) with active/history views, metadata, retry, reveal, copy, clear and device text filter. Durable history and a dedicated status selector remain open.
+- Audio capability detection based on runtime and Android API, plus independent official-scrcpy audio forwarding with cleanup and no custom codec.
+- Recording controls for MP4/MKV, H.264/H.265/AV1, optional audio, max size, FPS and bitrate.
+
+P2 automated code status is PARTIAL until the remaining icon/UI and transfer-history items above are complete. Audio and recording capability combinations are not hardware-accepted by source/build evidence.
 
 ## P3 — experimental
 
@@ -130,7 +133,9 @@ The following source-level P1 work is complete on `next`:
 
 The recording implementation deliberately uses a separate official scrcpy process: the embedded renderer currently exposes decoded H.264 frames and has no container muxer. This avoids adding a second codec stack or an unbounded re-encode queue, but requires hardware validation of graceful file finalization.
 
-P1 is complete in source. Hardware acceptance is still open. Remaining P2 is explicit Multi View group actions, configurable key mappings/shortcut UI, app-icon caching, richer transfer history, and audio/recording capability controls. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model.
+P1 code complete. P1 hardware acceptance PARTIAL; the remaining manual cases stay listed in `docs/P1_HARDWARE_ACCEPTANCE.md`.
+
+P2 is in progress as described above. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model, and has not been started.
 
 ## Verification matrix
 

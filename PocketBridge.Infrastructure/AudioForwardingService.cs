@@ -10,10 +10,10 @@ public sealed class AudioForwardingService(IAdbService adb, IExecutableLocator l
     private readonly ConcurrentDictionary<string, Process> _processes = new(StringComparer.Ordinal);
     public async Task<AudioCapability> DetectAsync(string serial)
     {
-        if (locator.Find("scrcpy.exe", settings.Load().ToolsDirectory) is null) return new(false, null, "opus", "scrcpy runtime is unavailable");
+        if (locator.Find("scrcpy.exe", settings.Load().ToolsDirectory) is null) return AudioCapabilityDetector.Evaluate(null, false);
         var result = await adb.ExecuteAsync(serial, "shell", "getprop", "ro.build.version.sdk");
-        if (!result.IsSuccess || !int.TryParse(result.StandardOutput.Trim(), out var api)) return new(false, null, "opus", "Android API could not be detected");
-        return api >= 30 ? new(true, api, "opus", null) : new(false, api, "opus", "Android 11 (API 30) or newer is required for audio capture");
+        if (!result.IsSuccess || !int.TryParse(result.StandardOutput.Trim(), out var api)) return AudioCapabilityDetector.Evaluate(null, true);
+        return AudioCapabilityDetector.Evaluate(api, true);
     }
     public bool IsRunning(string serial) => _processes.TryGetValue(serial, out var process) && !process.HasExited;
     public async Task StartAsync(AndroidDevice device)

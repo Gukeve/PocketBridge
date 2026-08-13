@@ -45,4 +45,5 @@
   <data name="Active" xml:space="preserve"><value>Active</value></data><data name="History" xml:space="preserve"><value>History</value></data><data name="Filter" xml:space="preserve"><value>Filter transfers</value></data><data name="RevealInExplorer" xml:space="preserve"><value>Reveal</value></data><data name="CopyDetails" xml:space="preserve"><value>Copy details</value></data><data name="ClearHistory" xml:space="preserve"><value>Clear history</value></data>
   <data name="StartAudio" xml:space="preserve"><value>Start audio</value></data><data name="StopAudio" xml:space="preserve"><value>Stop audio</value></data>
   <data name="RecordingVideoCodec" xml:space="preserve"><value>Video codec</value></data><data name="RecordingAudioTrack" xml:space="preserve"><value>Include audio track when supported</value></data>
+  <data name="AudioNotChecked" xml:space="preserve"><value>Audio: select a device</value></data><data name="AudioSupported" xml:space="preserve"><value>Audio forwarding: supported ({0}, API {1})</value></data><data name="AudioUnsupported" xml:space="preserve"><value>Audio forwarding: unsupported — {0}</value></data>
 </root>

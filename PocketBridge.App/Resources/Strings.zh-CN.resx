@@ -34,4 +34,5 @@
   <data name="Active" xml:space="preserve"><value>进行中</value></data><data name="History" xml:space="preserve"><value>历史记录</value></data><data name="Filter" xml:space="preserve"><value>筛选传输</value></data><data name="RevealInExplorer" xml:space="preserve"><value>在资源管理器中显示</value></data><data name="CopyDetails" xml:space="preserve"><value>复制详情</value></data><data name="ClearHistory" xml:space="preserve"><value>清除历史记录</value></data>
   <data name="StartAudio" xml:space="preserve"><value>启动音频</value></data><data name="StopAudio" xml:space="preserve"><value>停止音频</value></data>
   <data name="RecordingVideoCodec" xml:space="preserve"><value>视频编解码器</value></data><data name="RecordingAudioTrack" xml:space="preserve"><value>支持时包含音轨</value></data>
+  <data name="AudioNotChecked" xml:space="preserve"><value>音频：请选择设备</value></data><data name="AudioSupported" xml:space="preserve"><value>音频转发：支持（{0}，API {1}）</value></data><data name="AudioUnsupported" xml:space="preserve"><value>音频转发：不支持 — {0}</value></data>
 </root>

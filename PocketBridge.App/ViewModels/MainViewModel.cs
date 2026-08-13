@@ -42,6 +42,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _statusMessage = LocalizationService.Current["StatusRefreshing"];
     private StatusKind _statusKind = StatusKind.Neutral;
     private string _audioStatus = "Audio: not checked";
+    private bool _audioSupported;
 
     public MainViewModel(
         IAdbService adb,
@@ -115,7 +116,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         GroupScreenshotCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.CaptureScreenshotsAsync), CanRunGroupAction);
         GroupSendFilesCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.QueueFilesForDevicesAsync), CanRunGroupAction);
         GroupInstallApkCommand = new AsyncRelayCommand(() => ExecuteGroupFeatureAsync(_featureDialogs.InstallApkForDevicesAsync), CanRunGroupAction);
-        ToggleAudioCommand = new AsyncRelayCommand(ToggleAudioAsync, CanControl);
+        ToggleAudioCommand = new AsyncRelayCommand(ToggleAudioAsync, () => CanControl() && _audioSupported);
         _clipboardTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(750) };
         _clipboardTimer.Tick += ClipboardTimer_Tick;
         _clipboardTimer.Start();
@@ -209,6 +210,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(ShowSingleDeviceContent));
             UpdateSelectionMessage();
             NotifyCommands();
+            _ = RefreshAudioCapabilityAsync();
         }
     }
 
@@ -257,6 +259,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public string AudioStatus { get => _audioStatus; private set => SetProperty(ref _audioStatus, value); }
     public string AudioButtonText => SelectedDevice is { } selected && _audio.IsRunning(selected.Serial) ? LocalizationService.Current["StopAudio"] : LocalizationService.Current["StartAudio"];
+
+    private async Task RefreshAudioCapabilityAsync()
+    {
+        var selected = SelectedDevice;
+        if (selected is null) { _audioSupported = false; AudioStatus = LocalizationService.Current["AudioNotChecked"]; ToggleAudioCommand.NotifyCanExecuteChanged(); return; }
+        var capability = await _audio.DetectAsync(selected.Serial);
+        if (SelectedDevice?.Serial != selected.Serial) return;
+        _audioSupported = capability.IsSupported;
+        AudioStatus = capability.IsSupported ? LocalizationService.Current.Format("AudioSupported", capability.Codec, capability.AndroidApi) : LocalizationService.Current.Format("AudioUnsupported", capability.Reason ?? "unknown");
+        ToggleAudioCommand.NotifyCanExecuteChanged();
+    }
 
     public async Task InitializeAsync()
     {
