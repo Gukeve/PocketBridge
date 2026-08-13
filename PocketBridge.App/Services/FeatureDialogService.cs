@@ -4,6 +4,7 @@ using System.Windows;
 using PocketBridge.App.Localization;
 using PocketBridge.Core.Models;
 using PocketBridge.Core.Services;
+using PocketBridge.Infrastructure;
 
 namespace PocketBridge.App.Services;
 
@@ -63,9 +64,8 @@ public sealed class FeatureDialogService : IFeatureDialogService
         var settings = _settings.Load();
         var folder = string.IsNullOrWhiteSpace(settings.ScreenshotFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) : settings.ScreenshotFolder;
         Directory.CreateDirectory(folder!);
-        var deviceName = SanitizeFilename(device.FriendlyName);
         var template = string.IsNullOrWhiteSpace(settings.ScreenshotFilenameFormat) ? "PocketBridge_<device>_yyyy-MM-dd_HH-mm-ss" : settings.ScreenshotFilenameFormat;
-        var name = SanitizeFilename(DateTime.Now.ToString(template.Replace("<device>", deviceName, StringComparison.OrdinalIgnoreCase), System.Globalization.CultureInfo.InvariantCulture));
+        var name = ScreenshotFilenameFormatter.Format(template, device.FriendlyName, DateTime.Now);
         var path = Path.Combine(folder!, name + ".png");
         await _screenshots.CaptureAsync(device.Serial, path);
         ShowMediaResult(path, true);
@@ -115,5 +115,4 @@ public sealed class FeatureDialogService : IFeatureDialogService
         if (normalized.Split('/').Any(segment => segment == "..")) throw new InvalidOperationException(LocalizationService.Current["InvalidTransferDestination"]);
         return normalized.TrimEnd('/') + "/";
     }
-    private static string SanitizeFilename(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
 }

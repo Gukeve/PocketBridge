@@ -36,7 +36,20 @@ public sealed class RecordingService(IExecutableLocator locator, IAppSettingsSer
     public async Task<RecordingSession?> StopAsync(string serial)
     {
         if (!_active.TryGetValue(serial, out var holder)) return null;
-        if (!holder.Process.HasExited) holder.Process.Kill(true);
+        if (!holder.Process.HasExited)
+        {
+            var closeRequested = holder.Process.CloseMainWindow();
+            if (closeRequested)
+            {
+                var completed = await Task.WhenAny(holder.Completion.Task, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+                if (completed != holder.Completion.Task && !holder.Process.HasExited)
+                    holder.Process.Kill(true);
+            }
+            else
+            {
+                holder.Process.Kill(true);
+            }
+        }
         await holder.Completion.Task.ConfigureAwait(false);
         return holder.Session with { IsRunning = false };
     }

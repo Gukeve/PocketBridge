@@ -16,4 +16,5 @@ public partial class AdbConsoleWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Escape && _running is not null) { _running.Cancel(); e.Handled = true; } }
     private void Navigate(int delta) { if (_history.Count == 0) return; _historyIndex = Math.Clamp(_historyIndex + delta, 0, _history.Count); CommandBox.Text = _historyIndex == _history.Count ? string.Empty : _history[_historyIndex]; CommandBox.CaretIndex = CommandBox.Text.Length; }
     private void Cancel_Click(object sender, RoutedEventArgs e) => _running?.Cancel(); private void Clear_Click(object sender, RoutedEventArgs e) => OutputBox.Clear(); private void Copy_Click(object sender, RoutedEventArgs e) { if (OutputBox.Text.Length > 0) Clipboard.SetText(OutputBox.Text); }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

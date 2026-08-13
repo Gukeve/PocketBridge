@@ -12,5 +12,6 @@ public partial class DeviceInformationWindow : Window
     private static object[] Rows(DeviceInformation i) => new[] { new Row(L("FriendlyName"), i.FriendlyName), new Row(L("Manufacturer"), i.Manufacturer), new Row(L("Model"), i.Model), new Row(L("AndroidVersion"), $"{i.AndroidVersion} / SDK {i.Sdk}"), new Row(L("Serial"), i.Serial), new Row(L("ConnectionType"), i.ConnectionType), new Row("IP", i.IpAddress), new Row(L("Resolution"), i.Resolution), new Row("ABI", i.Abi), new Row(L("Battery"), $"{i.BatteryPercent} / {i.BatteryState}"), new Row(L("Storage"), i.Storage), new Row(L("Uptime"), i.Uptime) };
     private static string L(string key) => LocalizationService.Current[key];
     private void Copy_Click(object sender, RoutedEventArgs e) { if (_information is not null) Clipboard.SetText(_information.ToReport(PrivacyBox.IsChecked != false)); }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private sealed record Row(string Label, string Value);
 }

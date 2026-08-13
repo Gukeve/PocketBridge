@@ -59,6 +59,7 @@ public partial class ApplicationManagerWindow : Window
     private async void ClearData_Click(object sender, RoutedEventArgs e) { if (Selected is not { } app || !_confirmation.Confirm(LocalizationService.Current["ClearApplicationData"], LocalizationService.Current.Format("ConfirmClearApplicationData", app.Application.ApplicationName))) return; await RunSelectedAsync(package => _applications.ClearDataAsync(_device.Serial, package), LocalizationService.Current["ApplicationDataCleared"]); }
     private async void Details_Click(object sender, RoutedEventArgs e) => await RunSelectedAsync(package => _applications.OpenDetailsAsync(_device.Serial, package), LocalizationService.Current["ApplicationDetailsOpened"]);
     private void CopyPackage_Click(object sender, RoutedEventArgs e) { if (Selected is { } app) Clipboard.SetText(app.Application.PackageName); }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private async void Update_Click(object sender, RoutedEventArgs e)
     {
         if (Selected is not { } app) return;

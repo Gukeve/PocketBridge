@@ -35,6 +35,7 @@ public partial class TransferQueueWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) { if (Selected is { } row) _queue.Cancel(row.Id); }
     private void Retry_Click(object sender, RoutedEventArgs e) { if (Selected is { } row) _queue.Retry(row.Id); }
     private void ClearCompleted_Click(object sender, RoutedEventArgs e) => _queue.ClearCompleted();
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     private sealed record Row
     {

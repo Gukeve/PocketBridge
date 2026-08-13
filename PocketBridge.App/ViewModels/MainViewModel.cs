@@ -7,6 +7,7 @@ using PocketBridge.App.Services;
 using PocketBridge.App.Localization;
 using PocketBridge.Core.Models;
 using PocketBridge.Core.Services;
+using PocketBridge.Infrastructure;
 
 namespace PocketBridge.App.ViewModels;
 
@@ -280,6 +281,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var selected = SelectedDevice!;
         try
         {
+            await EnsureScrcpyCompatibleAsync(selected.Serial);
             SetStatus(LocalizationService.Current.Format("StatusStarting", selected.FriendlyName), StatusKind.Neutral);
             var profile = _profiles.Get(selected.Serial);
             await _embeddedSessions.StartAsync(selected.Device, profile.ToLaunchOptions(), _lifetime.Token);
@@ -311,6 +313,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var selected = SelectedDevice!;
         try
         {
+            await EnsureScrcpyCompatibleAsync(selected.Serial);
             await _embeddedSessions.StopAsync(selected.Serial);
             var profile = _profiles.Get(selected.Serial);
             await _embeddedSessions.StartAsync(selected.Device, profile.ToLaunchOptions(), _lifetime.Token);
@@ -328,6 +331,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var selected = SelectedDevice!;
         try
         {
+            await EnsureScrcpyCompatibleAsync(selected.Serial);
             var profile = _profiles.Get(selected.Serial);
             await _scrcpy.StartAsync(selected.Device, profile.ToLaunchOptions() with
             {
@@ -422,6 +426,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
             else
             {
+                await EnsureScrcpyCompatibleAsync(selected.Serial);
                 var settings = _settings.Load();
                 var format = settings.RecordingFormat.Equals("mkv", StringComparison.OrdinalIgnoreCase) ? "mkv" : "mp4";
                 var folder = string.IsNullOrWhiteSpace(settings.RecordingFolder) ? Environment.GetFolderPath(Environment.SpecialFolder.MyVideos) : settings.RecordingFolder;
@@ -440,6 +445,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
 
     private static string SanitizeFilename(string value) => string.Concat(value.Select(character => Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
+
+    private async Task EnsureScrcpyCompatibleAsync(string serial)
+    {
+        var result = await _adb.ExecuteAsync(serial, "shell", "getprop", "ro.build.version.sdk");
+        var apiLevel = result.IsSuccess ? ScrcpyCompatibility.ParseApiLevel(result.StandardOutput) : null;
+        if (apiLevel is not null && !ScrcpyCompatibility.IsSupported(apiLevel.Value))
+            throw new NotSupportedException(LocalizationService.Current.Format("ScrcpyAndroidUnsupported", apiLevel, ScrcpyCompatibility.MinimumApiLevel));
+    }
 
     private async Task SendClipboardToDeviceAsync()
     {

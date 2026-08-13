@@ -27,7 +27,9 @@ var tests = new (string Name, Action Run)[]
     ("Parses Android application metadata", ParsesAndroidApplicationMetadata),
     ("Application actions remain serial scoped", ApplicationActionsAreSerialScoped),
     ("Parses device properties", ParsesDeviceProperties),
-    ("Parses quoted ADB console commands", ParsesAdbConsoleCommand)
+    ("Parses quoted ADB console commands", ParsesAdbConsoleCommand),
+    ("Rejects Android versions unsupported by scrcpy", RejectsUnsupportedScrcpyAndroid),
+    ("Formats screenshot names without corrupting literals", FormatsScreenshotFilename)
 };
 
 var failed = 0;
@@ -340,6 +342,23 @@ static void ParsesAdbConsoleCommand()
 {
     var arguments = AdbConsoleService.Parse("shell am start -d \"https://example.invalid/a b\"");
     True(arguments.SequenceEqual(new[] { "shell", "am", "start", "-d", "https://example.invalid/a b" }), "Quoted ADB arguments were not preserved.");
+}
+
+static void RejectsUnsupportedScrcpyAndroid()
+{
+    Equal(19, ScrcpyCompatibility.ParseApiLevel("19\r\n"));
+    True(!ScrcpyCompatibility.IsSupported(19), "Android 4.4 must be rejected before starting scrcpy.");
+    True(ScrcpyCompatibility.IsSupported(21), "Android 5.0 must remain supported.");
+}
+
+static void FormatsScreenshotFilename()
+{
+    var timestamp = new DateTime(2026, 8, 13, 20, 50, 11);
+    var name = ScreenshotFilenameFormatter.Format("PocketBridge_<device>_yyyy-MM-dd_HH-mm-ss", "MI PLAY", timestamp);
+    Equal("PocketBridge_MI PLAY_2026-08-13_20-50-11", name);
+
+    var sanitized = ScreenshotFilenameFormatter.Format("PocketBridge_<device>_yyyy", "Phone: A", timestamp);
+    True(!sanitized.Contains(':'), "Invalid Windows filename characters must be replaced.");
 }
 
 static void True(bool condition, string message)

@@ -20,4 +20,5 @@ public partial class MediaResultWindow : Window
     {
         var image = new BitmapImage(); image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.UriSource = new Uri(_filePath); image.EndInit(); image.Freeze(); Clipboard.SetImage(image);
     }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }
