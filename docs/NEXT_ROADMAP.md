@@ -102,10 +102,13 @@ P2 code status is COMPLETE. P2 hardware acceptance remains PARTIAL because no ph
 
 ## P3 — experimental
 
-- Visual key mapping/gamepad/HID.
-- Virtual displays, desktop mode, camera mirroring, OTG.
-- LAN discovery and authenticated remote/web access.
-- Automation/scripts only after a permission model and destructive-action policy exist.
+- **Implemented foundation:** versioned portable input profiles, normalized touch/orientation transforms, keyboard/mouse/gamepad binding model, background XInput discovery and dead zones.
+- **Implemented capability layer:** Automatic/Standard/HID backend selection with safe fallback, UHID/OTG states, explicit separate OTG process, display listing and guarded official-scrcpy virtual-display launch presets.
+- **Implemented view-only LAN milestone:** disabled by default, localhost/private explicit bind, generated expiring/revocable token, embedded responsive canvas client, live raw-frame WebSocket publication and CSP/no-store headers.
+- **Implemented permission foundation:** typed remote permissions, typed automation triggers/actions/risk classes, destructive opt-in policy and bounded sensitive-data-minimized audit log.
+- **Still experimental/incomplete:** edit-controls overlay and runtime mapping execution; verified gamepad mapping; authenticated LAN control; Origin/replay protections needed before control; full automation trigger/action executor; multi-display embedded session tree; desktop app picker workflow; persistent audit UI.
+
+P3 code status is **PARTIAL**. See `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`; do not treat the foundation as production-grade remote control.
 
 ## First implementation slice
 
