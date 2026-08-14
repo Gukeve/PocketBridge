@@ -373,6 +373,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 _ = _automation.DispatchAsync(new(AutomationTrigger.DeviceDisconnected, prior), cancellationToken: _lifetime.Token);
             }
             _knownDeviceSerials = incomingSerials;
+            foreach (var ready in devices.Where(item => item.IsReady)) _ = DispatchDeviceSignalsAsync(ready);
 
             if (selectedSerial is not null && !incomingSerials.Contains(selectedSerial)) SelectedDevice = null;
             if (Devices.Count == 1 && SelectedDevice is null) SelectedDevice = Devices[0];
@@ -414,6 +415,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             SessionStateChanged();
         }
         catch (Exception exception) { SetStatus(exception.Message, StatusKind.Error); }
+    }
+
+    private async Task DispatchDeviceSignalsAsync(AndroidDevice device)
+    {
+        try
+        {
+            var battery = await _adb.ExecuteAsync(device.Serial, "shell", "dumpsys", "battery"); var levelLine = battery.StandardOutput.Split('\n').FirstOrDefault(line => line.TrimStart().StartsWith("level:", StringComparison.OrdinalIgnoreCase)); int? level = levelLine is null || !int.TryParse(levelLine.Split(':').Last().Trim(), out var parsed) ? null : parsed;
+            if (level is not null) await _automation.DispatchAsync(new(AutomationTrigger.BatteryBelowThreshold, device, level), cancellationToken: _lifetime.Token);
+            var wifi = await _adb.ExecuteAsync(device.Serial, "shell", "dumpsys", "wifi"); if (wifi.IsSuccess && (wifi.StandardOutput.Contains("Wi-Fi is enabled", StringComparison.OrdinalIgnoreCase) || wifi.StandardOutput.Contains("CONNECTED", StringComparison.OrdinalIgnoreCase))) await _automation.DispatchAsync(new(AutomationTrigger.WifiAvailable, device), cancellationToken: _lifetime.Token);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
     }
 
     private async Task StopAsync()
@@ -694,14 +706,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             double magnitude = binding.Input.ToUpperInvariant() switch { "LEFTX" => state.LeftX, "LEFTY" => state.LeftY, "RIGHTX" => state.RightX, "RIGHTY" => state.RightY, "LT" => state.LeftTrigger, "RT" => state.RightTrigger, _ => 0 };
             if (binding.SourceKind == InputSourceKind.GamepadButton && int.TryParse(binding.Input, out var mask)) magnitude = (state.Buttons & mask) != 0 ? 1 : 0;
             if (Math.Abs(magnitude) < binding.DeadZone) continue;
-            _ = ExecuteGamepadActionAsync(session, binding.Action, magnitude);
+            _ = ExecuteGamepadActionAsync(session, binding, magnitude);
         }
     }
 
-    private static async Task ExecuteGamepadActionAsync(IEmbeddedDisplaySession session, InputAction action, double magnitude)
+    private static async Task ExecuteGamepadActionAsync(IEmbeddedDisplaySession session, PocketBridge.Core.Models.KeyBinding binding, double magnitude)
     {
+        var action = binding.Action;
         if (action.Kind == InputActionKind.AndroidKey && int.TryParse(action.Value, out var key)) { await session.SendKeyAsync(AndroidKeyAction.Down, key); await session.SendKeyAsync(AndroidKeyAction.Up, key); }
-        else if (action.Kind is InputActionKind.TouchPoint or InputActionKind.VirtualJoystick && action.Point is { } point) { var pixel = point.ToPixels(session.VideoWidth, session.VideoHeight); await session.SendTouchAsync(AndroidTouchAction.Down, -11, pixel.X, pixel.Y, (float)Math.Abs(magnitude)); await session.SendTouchAsync(AndroidTouchAction.Up, -11, pixel.X, pixel.Y, 0); }
+        else if (action.Kind is InputActionKind.TouchPoint or InputActionKind.VirtualJoystick && action.Point is { } point) { var target = point; if (action.Kind == InputActionKind.VirtualJoystick) target = binding.Input.EndsWith("Y", StringComparison.OrdinalIgnoreCase) ? new(point.X, point.Y + action.Radius * magnitude) : new(point.X + action.Radius * magnitude, point.Y); var pixel = target.Clamp().ToPixels(session.VideoWidth, session.VideoHeight); await session.SendTouchAsync(AndroidTouchAction.Down, -11, pixel.X, pixel.Y, (float)Math.Abs(magnitude)); await session.SendTouchAsync(AndroidTouchAction.Up, -11, pixel.X, pixel.Y, 0); }
+        else if (action.Kind == InputActionKind.FreeLook && action.Region is { } region) { var center = new NormalizedPoint((region.Start.X + region.End.X) / 2, (region.Start.Y + region.End.Y) / 2); var target = binding.Input.EndsWith("Y", StringComparison.OrdinalIgnoreCase) ? new NormalizedPoint(center.X, center.Y + magnitude * action.Sensitivity * (region.End.Y - region.Start.Y) / 2) : new NormalizedPoint(center.X + magnitude * action.Sensitivity * (region.End.X - region.Start.X) / 2, center.Y); var pixel = target.Clamp().ToPixels(session.VideoWidth, session.VideoHeight); await session.SendTouchAsync(AndroidTouchAction.Move, -14, pixel.X, pixel.Y, (float)Math.Abs(magnitude)); }
     }
 
     private void OnClipboardChanged(object? sender, DeviceClipboardEventArgs e)

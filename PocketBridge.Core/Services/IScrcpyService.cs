@@ -7,7 +7,7 @@ public interface IScrcpyService
     event EventHandler<DeviceSession>? SessionChanged;
 
     Task<DeviceSession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions options);
-    Task StopAsync(string serial);
-    bool IsRunning(string serial);
+    Task StopAsync(string serial, int displayId = 0);
+    bool IsRunning(string serial, int displayId = 0);
     IReadOnlyCollection<DeviceSession> GetActiveSessions();
 }

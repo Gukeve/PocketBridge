@@ -32,7 +32,7 @@ public sealed class AuditLogService : IAuditLogService
     }
     public event EventHandler? Changed;
     public IReadOnlyList<AuditRecord> Items { get { lock (_items) return _items.ToArray(); } }
-    public void Append(AuditRecord record) { lock (_items) { _items.AddFirst(record); while (_items.Count > _maximum) _items.RemoveLast(); Persist(); } Changed?.Invoke(this, EventArgs.Empty); }
+    public void Append(AuditRecord record) { record = Sanitize(record); lock (_items) { _items.AddFirst(record); while (_items.Count > _maximum) _items.RemoveLast(); Persist(); } Changed?.Invoke(this, EventArgs.Empty); }
     public void Clear() { lock (_items) { _items.Clear(); Persist(); } Changed?.Invoke(this, EventArgs.Empty); }
     private void Load()
     {
@@ -50,6 +50,12 @@ public sealed class AuditLogService : IAuditLogService
     {
         var directory = Path.GetDirectoryName(_path)!; Directory.CreateDirectory(directory);
         var temporary = _path + ".tmp"; File.WriteAllText(temporary, JsonSerializer.Serialize(_items)); File.Move(temporary, _path, true);
+    }
+    private static AuditRecord Sanitize(AuditRecord value)
+    {
+        static string Text(string text, int maximum) => new(text.Where(character => !char.IsControl(character)).Take(maximum).ToArray());
+        var alias = Text(value.DeviceAlias, 64); if (alias.Contains(':') || alias.Length > 24 && alias.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')) alias = alias.Length <= 4 ? "Device" : $"Device ••••{alias[^4..]}";
+        return value with { Actor = Text(value.Actor, 64), DeviceAlias = alias, Action = Text(value.Action, 128), Result = Text(value.Result, 160), Category = Text(value.Category, 40) };
     }
 }
 

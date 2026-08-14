@@ -3,6 +3,7 @@ using PocketBridge.Core.Services;
 using PocketBridge.Infrastructure;
 using PocketBridge.Infrastructure.Embedded;
 using System.Buffers.Binary;
+using System.Xml.Linq;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -53,6 +54,13 @@ var tests = new (string Name, Action Run)[]
     ,("Automation dispatcher executes typed matching rules", AutomationDispatcherExecutesTypedRule)
     ,("Visible video coordinates survive letterboxing", VisibleVideoCoordinatesSurviveLetterboxing)
     ,("Input action geometry normalizes bounds", InputActionGeometryNormalizesBounds)
+    ,("LAN control rejects origin permission and replay attacks", LanControlRejectsAdversarialMessages)
+    ,("LAN control applies bounded request rate", LanControlAppliesRateLimit)
+    ,("Audit log sanitizes sensitive identifiers", AuditLogSanitizesIdentifiers)
+    ,("P3 localization keys have EN RU zh-CN parity", P3LocalizationKeysHaveParity)
+    ,("XInput axes and triggers normalize across controllers", XInputValuesNormalize)
+    ,("Automation permissions are action specific", AutomationPermissionsAreActionSpecific)
+    ,("Input profile file import export round-trips geometry", InputProfileFileRoundTripsGeometry)
 };
 
 var failed = 0;
@@ -597,6 +605,44 @@ static void InputActionGeometryNormalizesBounds()
     var action = new InputAction(InputActionKind.TouchRegion, "region", Region: new(new(1.2, .9), new(-.2, .1)), Radius: 1, DurationMs: 10, Sensitivity: 99).Normalize();
     Equal(new NormalizedPoint(0, .1), action.Region!.Start); Equal(new NormalizedPoint(1, .9), action.Region.End); Near(.5, action.Radius, .001); Equal(50, action.DurationMs); Near(10, action.Sensitivity, .001);
 }
+
+static void LanControlRejectsAdversarialMessages()
+{
+    var now = DateTimeOffset.UtcNow; var session = new RemoteSession(Guid.NewGuid(), "hash", now.AddMinutes(1), RemotePermission.ViewScreen | RemotePermission.ControlTouch, "Peer"); var gate = new RemoteControlSecurityGate("http://192.168.1.20:27183");
+    True(gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Valid control message was denied.");
+    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Duplicate sequence/nonce was accepted.");
+    True(!gate.Validate(session, Guid.NewGuid(), "http://192.168.1.20:27183", "tap", 2, "nonce-0000000009", now.ToUnixTimeMilliseconds(), now).Allowed, "Token/session mismatch was accepted.");
+    True(!gate.Validate(session, session.Id, "http://evil.invalid", "tap", 2, "nonce-0000000002", now.ToUnixTimeMilliseconds(), now).Allowed, "Unexpected Origin was accepted.");
+    True(!gate.Validate(session, session.Id, null, "tap", 2, "nonce-0000000003", now.ToUnixTimeMilliseconds(), now).Allowed, "Missing Origin was accepted.");
+    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "key", 2, "nonce-0000000004", now.ToUnixTimeMilliseconds(), now).Allowed, "Permission escalation was accepted.");
+    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "install", 2, "nonce-0000000005", now.ToUnixTimeMilliseconds(), now).Allowed, "Unknown/disallowed command was accepted.");
+    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000006", now.AddMinutes(-2).ToUnixTimeMilliseconds(), now).Allowed, "Stale timestamp was accepted.");
+    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000010", now.AddMinutes(2).ToUnixTimeMilliseconds(), now).Allowed, "Future timestamp was accepted.");
+    True(!gate.Validate(session with { ExpiresAt = now }, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000007", now.ToUnixTimeMilliseconds(), now).Allowed, "Expired session was accepted.");
+    gate.Revoke(session.Id); True(gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000008", now.ToUnixTimeMilliseconds(), now).Allowed, "Revoked gate state was not cleared for a newly authenticated session state.");
+}
+
+static void LanControlAppliesRateLimit()
+{
+    var now = DateTimeOffset.UtcNow; var session = new RemoteSession(Guid.NewGuid(), "hash", now.AddMinutes(1), RemotePermission.ControlTouch, "Peer"); var gate = new RemoteControlSecurityGate("http://localhost:27183", 2);
+    True(gate.Validate(session, session.Id, "http://localhost:27183", "tap", 1, "rate-nonce-000001", now.ToUnixTimeMilliseconds(), now).Allowed, "First request denied."); True(gate.Validate(session, session.Id, "http://localhost:27183", "tap", 2, "rate-nonce-000002", now.ToUnixTimeMilliseconds(), now).Allowed, "Second request denied."); True(!gate.Validate(session, session.Id, "http://localhost:27183", "tap", 3, "rate-nonce-000003", now.ToUnixTimeMilliseconds(), now).Allowed, "Rate limit did not reject excess request.");
+}
+
+static void AuditLogSanitizesIdentifiers()
+{
+    var path = Path.Combine(Path.GetTempPath(), $"pb-audit-redact-{Guid.NewGuid():N}.json"); try { var log = new AuditLogService(5, path); log.Append(new(DateTimeOffset.UtcNow, "peer\n", "0123456789ABCDEF0123456789ABCDEF", "touch\rpayload", "Denied", "Security", AuditSeverity.Warning)); var record = log.Items.Single(); True(!record.DeviceAlias.Contains("0123456789ABCDEF0123456789ABCDEF", StringComparison.Ordinal), "Full identifier was retained."); True(!record.Actor.Contains('\n') && !record.Action.Contains('\r'), "Control characters were retained."); }
+    finally { if (File.Exists(path)) File.Delete(path); }
+}
+
+static void P3LocalizationKeysHaveParity()
+{
+    static Dictionary<string, string> Load(string path) => XDocument.Load(path).Descendants("data").Where(item => item.Attribute("name")?.Value.StartsWith("P3_", StringComparison.Ordinal) == true).ToDictionary(item => item.Attribute("name")!.Value, item => item.Element("value")?.Value ?? string.Empty, StringComparer.Ordinal);
+    var root = Path.Combine(Directory.GetCurrentDirectory(), "PocketBridge.App", "Resources"); var en = Load(Path.Combine(root, "Strings.resx")); var ru = Load(Path.Combine(root, "Strings.ru-RU.resx")); var zh = Load(Path.Combine(root, "Strings.zh-CN.resx")); Equal(string.Join('|', en.Keys.Order()), string.Join('|', ru.Keys.Order())); Equal(string.Join('|', en.Keys.Order()), string.Join('|', zh.Keys.Order())); True(en.Values.All(value => !string.IsNullOrWhiteSpace(value)) && ru.Values.All(value => !string.IsNullOrWhiteSpace(value)) && zh.Values.All(value => !string.IsNullOrWhiteSpace(value)), "A P3 translation is empty.");
+}
+static void XInputValuesNormalize() { Near(-1, GamepadNormalization.Axis(short.MinValue), .0001); Near(1, GamepadNormalization.Axis(short.MaxValue), .0001); Near(0, GamepadNormalization.Axis(0), .0001); Near(0, GamepadNormalization.Trigger(0), .0001); Near(1, GamepadNormalization.Trigger(byte.MaxValue), .0001); for (var controller = 1; controller <= 4; controller++) { var state = new GamepadState(controller, true, 0, 0, 0, 0, 0, 0, 0); Equal(controller, state.Controller); } }
+static void AutomationPermissionsAreActionSpecific() { var home = new AutomationRule(Guid.NewGuid(), "Home", true, AutomationTrigger.DeviceConnected, AutomationAction.Home, AutomationRisk.Interactive, null, RemotePermission.ViewScreen); True(!AutomationPermissionPolicy.IsAllowed(home, false), "View permission authorized device buttons."); True(AutomationPermissionPolicy.IsAllowed(home with { GrantedPermissions = RemotePermission.DeviceButtons }, false), "Correct device-button permission was rejected."); var uninstall = home with { Action = AutomationAction.Uninstall, Risk = AutomationRisk.Destructive, GrantedPermissions = RemotePermission.ApplicationManager }; True(!AutomationPermissionPolicy.IsAllowed(uninstall, false), "Destructive action ran without opt-in."); True(AutomationPermissionPolicy.IsAllowed(uninstall, true), "Explicit destructive permission was rejected."); }
+static void InputProfileFileRoundTripsGeometry() { var root = Path.Combine(Path.GetTempPath(), $"pb-profile-{Guid.NewGuid():N}"); Directory.CreateDirectory(root); try { var settings = new InMemorySettingsService(new AppSettings()); var service = new InputMappingService(settings); var profile = new InputProfile(Guid.NewGuid(), "Geometry", [new(InputSourceKind.GamepadAxis, "LeftX", new(InputActionKind.VirtualJoystick, "stick", new(.3, .7), Radius: .18, Sensitivity: 1.4), .22), new(InputSourceKind.KeyboardKey, "Space", new(InputActionKind.Swipe, "swipe", Region: new(new(.1, .2), new(.8, .9)), DurationMs: 450))], "Private alias"); service.SaveAsync(profile).GetAwaiter().GetResult(); var path = Path.Combine(root, "profile.pbinput.json"); service.ExportAsync(profile.Id, path).GetAwaiter().GetResult(); var imported = service.ImportAsync(path).GetAwaiter().GetResult(); True(imported.Id != profile.Id, "Imported profile reused source id."); True(imported.TargetAlias is null, "Import retained private target alias."); Near(.18, imported.Bindings[0].Action.Radius, .001); Near(1.4, imported.Bindings[0].Action.Sensitivity, .001); Equal(450, imported.Bindings[1].Action.DurationMs); }
+    finally { Directory.Delete(root, true); } }
 
 static void True(bool condition, string message)
 {

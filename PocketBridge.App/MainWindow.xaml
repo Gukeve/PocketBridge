@@ -135,7 +135,7 @@
                                 </Grid>
                                 <TextBlock Text="{loc:Loc Advanced}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,6" />
                                 <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Button Grid.Column="0" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenDeviceInformationCommand}" Content="{loc:Loc DeviceInformation}" /><Button Grid.Column="2" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenAdbConsoleCommand}" Content="{loc:Loc AdbConsole}" /></Grid>
-                                <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Button Grid.Column="0" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenInputMappingCommand}" Content="Input Mapping" /><Button Grid.Column="2" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenExperimentalCommand}" Content="Experimental" /></Grid>
+                                <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Button Grid.Column="0" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenInputMappingCommand}" Content="{loc:Loc P3_InputMapping}" /><Button Grid.Column="2" Style="{StaticResource BaseButton}" MinHeight="34" Padding="6,4" FontSize="10" Command="{Binding OpenExperimentalCommand}" Content="{loc:Loc P3_Experimental}" /></Grid>
                             </StackPanel>
                         </Border>
                             <Border x:Name="PreviewPanel" Grid.Column="2" Background="#0C111B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="12">
@@ -149,7 +149,7 @@
                                         <controls:AndroidDisplayControl Session="{Binding SelectedEmbeddedSession}" MappingProfile="{Binding ActiveInputProfile}" IsMappingEditMode="{Binding IsMappingEditMode}" MappingProfileEdited="MappingProfile_Edited" />
                                     </Border>
                                     <Button x:Name="ExternalPreviewButton" Grid.Row="2" Style="{StaticResource BaseButton}" Command="{Binding OpenExternalCommand}" Content="{loc:Loc OpenExternal}" HorizontalAlignment="Center" />
-                                    <Button Grid.Row="2" Style="{StaticResource BaseButton}" Command="{Binding ToggleMappingEditCommand}" Content="{loc:Loc EditControls}" HorizontalAlignment="Left" />
+                                    <Button Grid.Row="2" Style="{StaticResource BaseButton}" Command="{Binding ToggleMappingEditCommand}" Content="{loc:Loc P3_EditControls}" HorizontalAlignment="Left" />
                                     <Border x:Name="FullscreenOverlay" Grid.RowSpan="3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="6" CornerRadius="10" Background="#CC111827"><Button Style="{StaticResource BaseButton}" Content="{loc:Loc Fullscreen}" Click="Fullscreen_Click" /></Border>
                                 </Grid>
                             </Border>

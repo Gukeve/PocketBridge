@@ -26,7 +26,8 @@ public sealed class ScrcpyService : IScrcpyService
             throw new InvalidOperationException("Нельзя запустить scrcpy: устройство не готово к подключению.");
         }
 
-        if (IsRunning(device.Serial))
+        var sessionKey = Key(device.Serial, options.DisplayId);
+        if (IsRunning(device.Serial, options.DisplayId))
         {
             throw new InvalidOperationException("Для этого устройства уже запущена активная сессия.");
         }
@@ -65,10 +66,11 @@ public sealed class ScrcpyService : IScrcpyService
             ProcessId = process.Id,
             StartTime = DateTimeOffset.Now,
             IsRunning = true
+            ,DisplayId = options.DisplayId
         };
 
         var holder = new SessionProcess(session, process);
-        if (!_sessions.TryAdd(device.Serial, holder))
+        if (!_sessions.TryAdd(sessionKey, holder))
         {
             process.Kill(true);
             process.Dispose();
@@ -76,17 +78,17 @@ public sealed class ScrcpyService : IScrcpyService
         }
 
         SessionChanged?.Invoke(this, session);
-        process.Exited += (_, _) => CompleteSession(device.Serial, holder);
+        process.Exited += (_, _) => CompleteSession(sessionKey, holder);
         if (process.HasExited)
         {
-            CompleteSession(device.Serial, holder);
+            CompleteSession(sessionKey, holder);
         }
         return Task.FromResult(session);
     }
 
-    public async Task StopAsync(string serial)
+    public async Task StopAsync(string serial, int displayId = 0)
     {
-        if (!_sessions.TryGetValue(serial, out var holder) || holder.Process.HasExited)
+        if (!_sessions.TryGetValue(Key(serial, displayId), out var holder) || holder.Process.HasExited)
         {
             return;
         }
@@ -95,8 +97,8 @@ public sealed class ScrcpyService : IScrcpyService
         await holder.Completion.Task.ConfigureAwait(false);
     }
 
-    public bool IsRunning(string serial) =>
-        _sessions.TryGetValue(serial, out var holder) && holder.Session.IsRunning && !holder.Process.HasExited;
+    public bool IsRunning(string serial, int displayId = 0) =>
+        _sessions.TryGetValue(Key(serial, displayId), out var holder) && holder.Session.IsRunning && !holder.Process.HasExited;
 
     public IReadOnlyCollection<DeviceSession> GetActiveSessions() =>
         _sessions.Values.Where(value => value.Session.IsRunning).Select(value => value.Session).ToArray();
@@ -122,6 +124,7 @@ public sealed class ScrcpyService : IScrcpyService
         holder.Completion.TrySetResult();
         holder.Process.Dispose();
     }
+    private static string Key(string serial, int displayId) => $"{serial}\u001f{displayId}";
 
     private sealed class SessionProcess
     {

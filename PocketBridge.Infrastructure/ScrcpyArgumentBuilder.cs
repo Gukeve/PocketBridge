@@ -23,6 +23,7 @@ public static class ScrcpyArgumentBuilder
         if (options.ClipboardMode != ClipboardSyncMode.Automatic) arguments.Add("--no-clipboard-autosync");
         if (!options.AudioEnabled) arguments.Add("--no-audio");
         if (options.FullScreen) arguments.Add("--fullscreen");
+        if (options.DisplayId != 0) arguments.Add($"--display-id={options.DisplayId}");
         return arguments;
     }
 }

@@ -36,7 +36,7 @@ public partial class App : Application
         _recordings = recordings;
         IDeviceDisplaySessionFactory displaySessionFactory = new DeviceDisplaySessionFactory(scrcpy, adb, locator, settings);
         IEmbeddedSessionManager embeddedSessions = new EmbeddedSessionManager(displaySessionFactory);
-        IAutomationService automation = new AutomationService(settings, audit, new AutomationActionExecutor(adb, new ScreenshotService(adb), embeddedSessions));
+        IAutomationService automation = new AutomationService(settings, audit, new AutomationActionExecutor(adb, new ScreenshotService(adb), embeddedSessions, recordings));
         IUpdateCheckService updates = new UpdateCheckService(locator, settings, runtimeTools, Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0");
         var confirmation = new MessageBoxConfirmationService();
         var featureDialogs = new FeatureDialogService(
@@ -50,7 +50,7 @@ public partial class App : Application
             new ApplicationService(adb), applicationIcons,
             settings,
             new DeviceInformationService(adb),
-            new AdbConsoleService(locator, settings), inputMappings, p3Capabilities, gamepads, inputBackend, virtualDisplays, lan, remoteSessions, automation, audit, embeddedSessions);
+            new AdbConsoleService(locator, settings), inputMappings, p3Capabilities, gamepads, inputBackend, virtualDisplays, lan, remoteSessions, automation, audit, embeddedSessions, scrcpy, adb);
         var viewModel = new MainViewModel(adb, scrcpy, embeddedSessions, locator, settings, runtimeTools, profiles, new SettingsDialogService(settings, runtimeTools, updates), new DeviceProfileDialogService(profiles), confirmation, featureDialogs, recordings, new GroupActionService(adb), audio, mediaCapabilities, lan, inputMappings, automation, gamepads);
         _audio = audio;
         var window = new MainWindow(viewModel);
