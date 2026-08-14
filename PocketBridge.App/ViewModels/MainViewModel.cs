@@ -293,6 +293,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var binding = new KeyBinding(InputSourceKind.KeyboardKey, $"Key{number}", new InputAction(InputActionKind.TouchPoint, "tap", point));
         await _inputMappings.SaveAsync(profile with { Bindings = profile.Bindings.Append(binding).ToArray() }); OnPropertyChanged(nameof(ActiveInputProfile));
     }
+    public async Task SaveMappingProfileAsync(InputProfile profile) { await _inputMappings.SaveAsync(profile); OnPropertyChanged(nameof(ActiveInputProfile)); }
 
     private async Task RefreshAudioCapabilityAsync()
     {

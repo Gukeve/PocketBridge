@@ -146,7 +146,7 @@
                                         <TextBlock Text="scrcpy-server 4.1 · H.264 · встроенный режим" Margin="0,5,0,8" Foreground="{StaticResource SecondaryTextBrush}" FontSize="11" />
                                     </StackPanel>
                                     <Border Grid.Row="1" Margin="0,0,0,8" CornerRadius="10" BorderBrush="#3A465F" BorderThickness="1" Background="#05070B" ClipToBounds="True">
-                                        <controls:AndroidDisplayControl Session="{Binding SelectedEmbeddedSession}" MappingProfile="{Binding ActiveInputProfile}" IsMappingEditMode="{Binding IsMappingEditMode}" MappingPointCreated="MappingPoint_Created" />
+                                        <controls:AndroidDisplayControl Session="{Binding SelectedEmbeddedSession}" MappingProfile="{Binding ActiveInputProfile}" IsMappingEditMode="{Binding IsMappingEditMode}" MappingProfileEdited="MappingProfile_Edited" />
                                     </Border>
                                     <Button x:Name="ExternalPreviewButton" Grid.Row="2" Style="{StaticResource BaseButton}" Command="{Binding OpenExternalCommand}" Content="{loc:Loc OpenExternal}" HorizontalAlignment="Center" />
                                     <Button Grid.Row="2" Style="{StaticResource BaseButton}" Command="{Binding ToggleMappingEditCommand}" Content="{loc:Loc EditControls}" HorizontalAlignment="Left" />

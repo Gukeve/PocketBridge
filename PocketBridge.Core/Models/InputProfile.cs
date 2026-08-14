@@ -14,8 +14,14 @@ public sealed record NormalizedPoint(double X, double Y)
         return ((int)Math.Round(transformed.X * width), (int)Math.Round(transformed.Y * height));
     }
 }
-public sealed record NormalizedRegion(NormalizedPoint Start, NormalizedPoint End);
-public sealed record InputAction(InputActionKind Kind, string Value, NormalizedPoint? Point = null, NormalizedRegion? Region = null);
+public sealed record NormalizedRegion(NormalizedPoint Start, NormalizedPoint End)
+{
+    public NormalizedRegion Ordered() { var start = Start.Clamp(); var end = End.Clamp(); return new(new(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y)), new(Math.Max(start.X, end.X), Math.Max(start.Y, end.Y))); }
+}
+public sealed record InputAction(InputActionKind Kind, string Value, NormalizedPoint? Point = null, NormalizedRegion? Region = null, double Radius = 0.12, int DurationMs = 300, double Sensitivity = 1.0, bool Snap = false)
+{
+    public InputAction Normalize() => this with { Point = Point?.Clamp(), Region = Region?.Ordered(), Radius = Math.Clamp(Radius, 0.02, 0.5), DurationMs = Math.Clamp(DurationMs, 50, 5000), Sensitivity = Math.Clamp(Sensitivity, 0.1, 10) };
+}
 public sealed record KeyBinding(InputSourceKind SourceKind, string Input, InputAction Action, double DeadZone = 0.18);
 public sealed record InputProfile(Guid Id, string Name, IReadOnlyList<KeyBinding> Bindings, string? TargetAlias = null, int SchemaVersion = 1)
 {

@@ -10,6 +10,16 @@
     <Grid ClipToBounds="True">
         <Image x:Name="VideoImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
         <Canvas x:Name="MappingOverlay" Background="#22000000" Visibility="Collapsed" MouseLeftButtonDown="OnOverlayClick" Panel.ZIndex="5" />
+        <Border x:Name="EditorToolbar" Panel.ZIndex="7" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="8" Padding="7" CornerRadius="9" Background="#EE111827" BorderBrush="#526A9E" BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <ComboBox x:Name="EditToolBox" Width="130" SelectionChanged="EditTool_Changed" ToolTip="Control type" />
+                <Button Content="Undo" Click="Undo_Click" Margin="6,0,0,0" MinWidth="52" />
+                <Button Content="Redo" Click="Redo_Click" Margin="4,0,0,0" MinWidth="52" />
+                <Button Content="Duplicate" Click="Duplicate_Click" Margin="4,0,0,0" MinWidth="68" />
+                <Button Content="Delete" Click="Delete_Click" Margin="4,0,0,0" MinWidth="58" />
+                <CheckBox x:Name="SnapBox" Content="Snap" Margin="8,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
         <Border x:Name="MetricsOverlay" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
                 Padding="7,5" CornerRadius="5" Background="#CC080B12" BorderBrush="#526A9E" BorderThickness="1"
                 Visibility="Collapsed" IsHitTestVisible="False">

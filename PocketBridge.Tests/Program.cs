@@ -51,6 +51,8 @@ var tests = new (string Name, Action Run)[]
     ,("LAN access is disabled by default", LanAccessDisabledByDefault)
     ,("Embedded sessions are isolated by display", EmbeddedSessionsAreDisplayScoped)
     ,("Automation dispatcher executes typed matching rules", AutomationDispatcherExecutesTypedRule)
+    ,("Visible video coordinates survive letterboxing", VisibleVideoCoordinatesSurviveLetterboxing)
+    ,("Input action geometry normalizes bounds", InputActionGeometryNormalizesBounds)
 };
 
 var failed = 0;
@@ -583,10 +585,24 @@ static void AutomationDispatcherExecutesTypedRule()
 }
 static AndroidDevice Device(string name) => new(name + "-serial", name, null, null, null, DeviceConnectionType.Usb, AndroidDeviceState.Device);
 
+static void VisibleVideoCoordinatesSurviveLetterboxing()
+{
+    var sideBars = InputCoordinateMapper.Fit(1600, 900, 1080, 1920); var center = sideBars.ToNormalized(800, 450); True(center is not null, "Portrait video center was outside visible rect."); Near(.5, center!.X, .001); Near(.5, center.Y, .001); True(sideBars.ToNormalized(10, 450) is null, "Letterbox side bar mapped to Android.");
+    var topBars = InputCoordinateMapper.Fit(900, 1600, 1920, 1080); center = topBars.ToNormalized(450, 800); True(center is not null, "Landscape video center was outside visible rect."); Near(.5, center!.X, .001); Near(.5, center.Y, .001); True(topBars.ToNormalized(450, 10) is null, "Letterbox top bar mapped to Android.");
+    var control = topBars.ToControl(new(.25, .75)); var roundTrip = topBars.ToNormalized(control.X, control.Y)!; Near(.25, roundTrip.X, .001); Near(.75, roundTrip.Y, .001);
+}
+
+static void InputActionGeometryNormalizesBounds()
+{
+    var action = new InputAction(InputActionKind.TouchRegion, "region", Region: new(new(1.2, .9), new(-.2, .1)), Radius: 1, DurationMs: 10, Sensitivity: 99).Normalize();
+    Equal(new NormalizedPoint(0, .1), action.Region!.Start); Equal(new NormalizedPoint(1, .9), action.Region.End); Near(.5, action.Radius, .001); Equal(50, action.DurationMs); Near(10, action.Sensitivity, .001);
+}
+
 static void True(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
 }
+static void Near(double expected, double actual, double tolerance) { if (Math.Abs(expected - actual) > tolerance) throw new InvalidOperationException($"Expected {expected}, got {actual}."); }
 
 sealed class RecordingAdbService : IAdbService
 {

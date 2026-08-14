@@ -49,7 +49,7 @@ public partial class MainWindow : Window
     }
 
     private void GroupTarget_Changed(object sender, RoutedEventArgs e) => _viewModel.GroupSelectionChanged();
-    private async void MappingPoint_Created(object sender, PocketBridge.Core.Models.NormalizedPoint point) => await _viewModel.AddMappingPointAsync(point);
+    private async void MappingProfile_Edited(object sender, PocketBridge.Core.Models.InputProfile profile) => await _viewModel.SaveMappingProfileAsync(profile);
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e) => ToggleFullscreen();
 

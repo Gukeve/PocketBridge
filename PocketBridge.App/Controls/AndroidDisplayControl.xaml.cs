@@ -19,7 +19,7 @@ public partial class AndroidDisplayControl : UserControl
         new PropertyMetadata(null, OnSessionChanged));
     public static readonly DependencyProperty MappingProfileProperty = DependencyProperty.Register(nameof(MappingProfile), typeof(InputProfile), typeof(AndroidDisplayControl), new PropertyMetadata(null, OnMappingChanged));
     public static readonly DependencyProperty IsMappingEditModeProperty = DependencyProperty.Register(nameof(IsMappingEditMode), typeof(bool), typeof(AndroidDisplayControl), new PropertyMetadata(false, OnMappingChanged));
-    public event EventHandler<NormalizedPoint>? MappingPointCreated;
+    public event EventHandler<InputProfile>? MappingProfileEdited;
 
     private WriteableBitmap? _bitmap;
     private VideoFrame? _latestFrame;
@@ -43,6 +43,7 @@ public partial class AndroidDisplayControl : UserControl
     public AndroidDisplayControl()
     {
         InitializeComponent();
+        InitializeEditor();
         SizeChanged += (_, _) => { UpdateVideoLayout(); RefreshOverlay(); };
 #if DEBUG
         MetricsOverlay.Visibility = Visibility.Visible;
@@ -232,6 +233,8 @@ public partial class AndroidDisplayControl : UserControl
     {
         if (IsMappingEditMode) return;
         Focus();
+        var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.MouseButton && string.Equals(item.Input, "Left", StringComparison.OrdinalIgnoreCase));
+        if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, true); e.Handled = true; return; }
         if (!TryMap(e.GetPosition(this), out var x, out var y) || Session is null) return;
         CaptureMouse();
         _pointerDown = true;
@@ -248,6 +251,8 @@ public partial class AndroidDisplayControl : UserControl
 
     private async void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.MouseButton && string.Equals(item.Input, "Left", StringComparison.OrdinalIgnoreCase));
+        if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, false); e.Handled = true; return; }
         if (!_pointerDown || Session is null) return;
         if (TryMap(e.GetPosition(this), out var x, out var y)) await Session.SendTouchAsync(AndroidTouchAction.Up, -2, x, y, 0, 0);
         _pointerDown = false;
@@ -265,6 +270,8 @@ public partial class AndroidDisplayControl : UserControl
     private async void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (Session is null) return;
+        var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.MouseButton && string.Equals(item.Input, "Right", StringComparison.OrdinalIgnoreCase));
+        if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, true); await ExecuteMappedAsync(mapped.Action, false); e.Handled = true; return; }
         await Session.SendKeyAsync(AndroidKeyAction.Down, 4);
         await Session.SendKeyAsync(AndroidKeyAction.Up, 4);
         e.Handled = true;
@@ -272,6 +279,7 @@ public partial class AndroidDisplayControl : UserControl
 
     private async void OnKeyDown(object sender, KeyEventArgs e)
     {
+        if (HandleEditorKey(e)) { e.Handled = true; return; }
         if (Session is null) return;
         var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.KeyboardKey && string.Equals(item.Input, e.Key.ToString(), StringComparison.OrdinalIgnoreCase));
         if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, true); e.Handled = true; return; }
@@ -322,26 +330,23 @@ public partial class AndroidDisplayControl : UserControl
         {
             var pixel = point.ToPixels(Session.VideoWidth, Session.VideoHeight); await Session.SendTouchAsync(pressed ? AndroidTouchAction.Down : AndroidTouchAction.Up, -10, pixel.X, pixel.Y, pressed ? 1 : 0, 0);
         }
+        else if (action.Kind is InputActionKind.TouchRegion or InputActionKind.FreeLook && action.Region is { } region)
+        {
+            var center = new NormalizedPoint((region.Start.X + region.End.X) / 2, (region.Start.Y + region.End.Y) / 2).ToPixels(Session.VideoWidth, Session.VideoHeight); await Session.SendTouchAsync(pressed ? AndroidTouchAction.Down : AndroidTouchAction.Up, -12, center.X, center.Y, pressed ? 1 : 0, 0);
+        }
+        else if (action.Kind == InputActionKind.Swipe && pressed && action.Region is { } swipe)
+        {
+            var start = swipe.Start.ToPixels(Session.VideoWidth, Session.VideoHeight); var end = swipe.End.ToPixels(Session.VideoWidth, Session.VideoHeight); await Session.SendTouchAsync(AndroidTouchAction.Down, -13, start.X, start.Y); await Task.Delay(action.DurationMs); await Session.SendTouchAsync(AndroidTouchAction.Move, -13, end.X, end.Y); await Session.SendTouchAsync(AndroidTouchAction.Up, -13, end.X, end.Y, 0);
+        }
     }
 
     private void OnOverlayClick(object sender, MouseButtonEventArgs e)
     {
-        if (!IsMappingEditMode || Session is null || !TryMap(e.GetPosition(this), out var x, out var y)) return;
-        MappingPointCreated?.Invoke(this, new NormalizedPoint((double)x / Session.VideoWidth, (double)y / Session.VideoHeight).Clamp()); e.Handled = true;
+        EditorCanvasDown(e);
     }
 
     private void RefreshOverlay()
     {
-        MappingOverlay.Visibility = IsMappingEditMode ? Visibility.Visible : Visibility.Collapsed; MappingOverlay.Children.Clear();
-        if (!IsMappingEditMode || Session is not { VideoWidth: > 0, VideoHeight: > 0 } || MappingProfile is null) return;
-        var imageOrigin = VideoImage.TranslatePoint(new Point(), this);
-        var scale = Math.Min(VideoImage.ActualWidth / Session.VideoWidth, VideoImage.ActualHeight / Session.VideoHeight);
-        var displayedWidth = Session.VideoWidth * scale; var displayedHeight = Session.VideoHeight * scale;
-        var left = imageOrigin.X + (VideoImage.ActualWidth - displayedWidth) / 2; var top = imageOrigin.Y + (VideoImage.ActualHeight - displayedHeight) / 2;
-        foreach (var binding in MappingProfile.Bindings.Where(item => item.Action.Point is not null))
-        {
-            var point = binding.Action.Point!.Clamp(); var marker = new Border { Width = 46, Height = 46, CornerRadius = new CornerRadius(23), Background = new SolidColorBrush(Color.FromArgb(190, 82, 106, 158)), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Child = new TextBlock { Text = binding.Input, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, TextTrimming = TextTrimming.CharacterEllipsis } };
-            Canvas.SetLeft(marker, left + point.X * displayedWidth - 23); Canvas.SetTop(marker, top + point.Y * displayedHeight - 23); MappingOverlay.Children.Add(marker);
-        }
+        EditorRefresh();
     }
 }
