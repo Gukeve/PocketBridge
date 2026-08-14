@@ -106,10 +106,10 @@ P2 code status is COMPLETE. P2 hardware acceptance remains PARTIAL because no ph
 - **Implemented capability layer:** Automatic/Standard/HID backend selection with safe fallback, UHID/OTG states, explicit separate OTG process, display listing and guarded official-scrcpy virtual-display launch presets.
 - **Implemented LAN security boundary:** disabled by default, explicit private bind and Origin, expiring/revocable hashed token, per-message permission/expiry/Origin/monotonic-sequence checks, immediate revoke, typed control routing by server-owned alias and CSP/no-store headers.
 - **Implemented permission foundation:** typed remote permissions, typed automation triggers/actions/risk classes, destructive opt-in policy and bounded sensitive-data-minimized audit log.
-- **Implemented in the current checkpoint:** embedded edit-controls overlay aligned to the letterboxed video, persisted normalized points, actual keyboard/touch runtime execution, and atomically persisted bounded audit records.
-- **Still experimental/incomplete:** verified physical gamepad mapping; automation trigger/action executor; multi-display embedded session tree and secondary-display workflow; persistent audit viewer UI; full P3 RU/EN/zh-CN localization; adversarial LAN tests.
+- **Completed P3 code:** embedded edit-controls editor for point/region/swipe/joystick/free-look with drag/resize/nudge/snap/undo/redo; shared visible-video coordinate mapping; keyboard/mouse/XInput execution; portable profile import/export; display-scoped embedded/external sessions; experimental guarded Android virtual display; typed device-scoped automation; persistent redacted audit UI/export; permission-scoped LAN control with adversarial gates and bounded limits; RU/EN/zh-CN P3 key parity.
+- **Acceptance still external:** physical gamepad and Android mapper execution, real secondary/virtual displays, private-LAN browser/control/revoke/flood testing and two-device serial isolation require hardware/network peers.
 
-P3 code status is **PARTIAL**. The typed automation dispatcher/executor, display-scoped embedded sessions and persistent audit page now exist, but drag/drop regions/joysticks, complete P3 localization, secondary-display app workflow and adversarial LAN coverage remain open. See `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`.
+P3 code status is **COMPLETE** for the scoped P3 implementation. P3 security is **CODE COMPLETE / HARDWARE-NETWORK NOT VERIFIED**. P3 hardware is **NOT VERIFIED** for this completion pass; see `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`.
 
 ## First implementation slice
 

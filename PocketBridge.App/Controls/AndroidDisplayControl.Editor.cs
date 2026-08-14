@@ -14,7 +14,7 @@ public partial class AndroidDisplayControl
     private int _selectedBinding = -1;
     private Point? _dragStart;
     private InputAction? _dragOriginal;
-    private bool _resizeDrag;
+    private int _dragHandle;
     private NormalizedPoint? _createStart;
 
     private void InitializeEditor()
@@ -45,7 +45,7 @@ public partial class AndroidDisplayControl
 
     private void RenderBinding(int index, PocketBridge.Core.Models.KeyBinding binding, VisibleVideoRect rect)
     {
-        var action = binding.Action.Normalize(); var selected = index == _selectedBinding; var accent = selected ? Color.FromRgb(96, 165, 250) : Color.FromRgb(82, 106, 158);
+        var action = binding.Action.Normalize(); var selected = index == _selectedBinding; var accent = action.Kind == InputActionKind.FreeLook ? Color.FromRgb(168, 85, 247) : selected ? Color.FromRgb(96, 165, 250) : Color.FromRgb(82, 106, 158);
         if (action.Kind is InputActionKind.TouchRegion or InputActionKind.FreeLook && action.Region is { } region)
         {
             var start = rect.ToControl(region.Start); var end = rect.ToControl(region.End); var border = EditorBorder(index, binding.Input, accent, action.Kind == InputActionKind.FreeLook ? new DoubleCollection { 5, 3 } : null);
@@ -54,6 +54,7 @@ public partial class AndroidDisplayControl
         if (action.Kind == InputActionKind.Swipe && action.Region is { } swipe)
         {
             var start = rect.ToControl(swipe.Start); var end = rect.ToControl(swipe.End); var line = new Line { X1 = start.X, Y1 = start.Y, X2 = end.X, Y2 = end.Y, Stroke = new SolidColorBrush(accent), StrokeThickness = selected ? 5 : 3, Tag = index, ToolTip = $"{binding.Input} · {action.DurationMs} ms" }; HookDrag(line, false); MappingOverlay.Children.Add(line);
+            var angle = Math.Atan2(end.Y - start.Y, end.X - start.X); var arrow = new Polygon { Fill = new SolidColorBrush(accent), IsHitTestVisible = false, Points = new PointCollection { new(end.X, end.Y), new(end.X - 18 * Math.Cos(angle - .45), end.Y - 18 * Math.Sin(angle - .45)), new(end.X - 18 * Math.Cos(angle + .45), end.Y - 18 * Math.Sin(angle + .45)) } }; MappingOverlay.Children.Add(arrow);
             AddEndpoint(index, start.X, start.Y, accent, false); AddEndpoint(index, end.X, end.Y, accent, true); return;
         }
         var point = action.Point ?? new NormalizedPoint(.5, .5); var center = rect.ToControl(point); var diameter = action.Kind == InputActionKind.VirtualJoystick ? Math.Max(48, action.Radius * 2 * Math.Min(rect.Width, rect.Height)) : 46;
@@ -68,8 +69,9 @@ public partial class AndroidDisplayControl
     }
 
     private void AddResizeHandle(int index, double x, double y, Color color) { var handle = new Border { Width = 14, Height = 14, CornerRadius = new CornerRadius(3), Background = new SolidColorBrush(color), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Tag = index, Cursor = Cursors.SizeNWSE }; HookDrag(handle, true); Canvas.SetLeft(handle, x - 7); Canvas.SetTop(handle, y - 7); MappingOverlay.Children.Add(handle); }
-    private void AddEndpoint(int index, double x, double y, Color color, bool resize) { var endpoint = new Ellipse { Width = 16, Height = 16, Fill = new SolidColorBrush(color), Stroke = Brushes.White, StrokeThickness = 1, Tag = index, Cursor = Cursors.SizeAll }; HookDrag(endpoint, resize); Canvas.SetLeft(endpoint, x - 8); Canvas.SetTop(endpoint, y - 8); MappingOverlay.Children.Add(endpoint); }
-    private void HookDrag(FrameworkElement element, bool resize) { element.MouseLeftButtonDown += (_, e) => { if (MappingProfile is null || element.Tag is not int index) return; _selectedBinding = index; _dragStart = e.GetPosition(this); _dragOriginal = MappingProfile.Bindings[index].Action; _resizeDrag = resize; element.CaptureMouse(); RefreshOverlay(); e.Handled = true; }; }
+    private void AddEndpoint(int index, double x, double y, Color color, bool end) { var endpoint = new Ellipse { Width = 16, Height = 16, Fill = new SolidColorBrush(color), Stroke = Brushes.White, StrokeThickness = 1, Tag = index, Cursor = Cursors.SizeAll }; HookDrag(endpoint, end ? 1 : 2); Canvas.SetLeft(endpoint, x - 8); Canvas.SetTop(endpoint, y - 8); MappingOverlay.Children.Add(endpoint); }
+    private void HookDrag(FrameworkElement element, bool resize) => HookDrag(element, resize ? 1 : 0);
+    private void HookDrag(FrameworkElement element, int handle) { element.MouseLeftButtonDown += (_, e) => { if (MappingProfile is null || element.Tag is not int index) return; _selectedBinding = index; _dragStart = e.GetPosition(this); _dragOriginal = MappingProfile.Bindings[index].Action; _dragHandle = handle; element.CaptureMouse(); RefreshOverlay(); e.Handled = true; }; }
 
     private void EditorCanvasDown(MouseButtonEventArgs e)
     {
@@ -84,8 +86,9 @@ public partial class AndroidDisplayControl
     {
         if (_dragStart is null || _dragOriginal is null || MappingProfile is null || _selectedBinding < 0 || Normalized(e.GetPosition(this)) is not { } current || Normalized(_dragStart.Value) is not { } start) return;
         var dx = current.X - start.X; var dy = current.Y - start.Y; var action = _dragOriginal;
-        if (_resizeDrag && action.Kind == InputActionKind.VirtualJoystick && action.Point is { } center) action = action with { Radius = Math.Max(.02, Math.Sqrt(Math.Pow(current.X - center.X, 2) + Math.Pow(current.Y - center.Y, 2))) };
-        else if (_resizeDrag && action.Region is { } region) action = action with { Region = new(region.Start, SnapPoint(current)) };
+        if (_dragHandle == 1 && action.Kind == InputActionKind.VirtualJoystick && action.Point is { } center) action = action with { Radius = Math.Max(.02, Math.Sqrt(Math.Pow(current.X - center.X, 2) + Math.Pow(current.Y - center.Y, 2))) };
+        else if (_dragHandle == 1 && action.Region is { } region) action = action with { Region = new(region.Start, SnapPoint(current)) };
+        else if (_dragHandle == 2 && action.Region is { } startRegion) action = action with { Region = new(SnapPoint(current), startRegion.End) };
         else if (action.Point is { } point) action = action with { Point = SnapPoint(new(point.X + dx, point.Y + dy)) };
         else if (action.Region is { } movedRegion) action = action with { Region = new(SnapPoint(new NormalizedPoint(movedRegion.Start.X + dx, movedRegion.Start.Y + dy)), SnapPoint(new NormalizedPoint(movedRegion.End.X + dx, movedRegion.End.Y + dy))) };
         ReplaceSelected(action.Normalize(), false);
