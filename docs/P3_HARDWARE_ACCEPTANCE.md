@@ -19,3 +19,16 @@ Runtime: official scrcpy 4.1
 | Automation execution | NOT TESTED | Store and permission policy are implemented; event-driven action execution is not enabled. |
 
 `NOT SUPPORTED` is not a failure.
+
+## Current checkpoint
+
+At the latest 2026-08-14 verification, `tools/adb.exe devices -l` reported no connected Android devices. Therefore none of the newly implemented runtime mapper, LAN control/revoke, automation dispatcher, or display-scoped embedded-session changes have new hardware evidence. Earlier MI PLAY evidence above is retained as historical evidence only.
+
+Required manual acceptance remains:
+
+- gamepad mapping with a physical XInput controller;
+- LAN view/control from another device on the same private network;
+- active-session revoke and invalid token/Origin attempts;
+- automation connect/disconnect/session/battery behavior;
+- disconnect/reconnect cleanup and secondary-display lifecycle;
+- two-device immutable-serial isolation when two Android devices are present.

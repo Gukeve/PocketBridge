@@ -49,6 +49,8 @@ var tests = new (string Name, Action Run)[]
     ,("Automation destructive actions require opt-in", AutomationDestructiveRequiresOptIn)
     ,("Audit log remains bounded", AuditLogRemainsBounded)
     ,("LAN access is disabled by default", LanAccessDisabledByDefault)
+    ,("Embedded sessions are isolated by display", EmbeddedSessionsAreDisplayScoped)
+    ,("Automation dispatcher executes typed matching rules", AutomationDispatcherExecutesTypedRule)
 };
 
 var failed = 0;
@@ -553,13 +555,33 @@ static void AutomationDestructiveRequiresOptIn()
 
 static void AuditLogRemainsBounded()
 {
-    var log = new AuditLogService(3); for (var index = 0; index < 5; index++) log.Append(new AuditRecord(DateTimeOffset.UtcNow, "Local user", "Phone", $"Action {index}", "Success")); Equal(3, log.Items.Count); Equal("Action 4", log.Items[0].Action);
+    var path = Path.Combine(Path.GetTempPath(), $"pocketbridge-audit-{Guid.NewGuid():N}.json");
+    try { var log = new AuditLogService(3, path); for (var index = 0; index < 5; index++) log.Append(new AuditRecord(DateTimeOffset.UtcNow, "Local user", "Phone", $"Action {index}", "Success")); Equal(3, log.Items.Count); Equal("Action 4", log.Items[0].Action); var restored = new AuditLogService(3, path); Equal(3, restored.Items.Count); Equal("Action 4", restored.Items[0].Action); }
+    finally { if (File.Exists(path)) File.Delete(path); }
 }
 
 static void LanAccessDisabledByDefault()
 {
     var settings = new AppSettings(); True(!settings.LanEnabled, "LAN must be opt-in."); Equal("127.0.0.1", settings.LanBindAddress);
 }
+
+static void EmbeddedSessionsAreDisplayScoped()
+{
+    var manager = new EmbeddedSessionManager(new FakeDisplaySessionFactory()); var device = Device("display-phone");
+    var primary = manager.StartAsync(device, new ScrcpyLaunchOptions { DisplayId = 0 }).GetAwaiter().GetResult();
+    var secondary = manager.StartAsync(device, new ScrcpyLaunchOptions { DisplayId = 7 }).GetAwaiter().GetResult();
+    True(!ReferenceEquals(primary, secondary), "Secondary display reused the primary session."); Equal(0, primary.DisplayId); Equal(7, secondary.DisplayId);
+    manager.StopAsync(device.Serial, 7).GetAwaiter().GetResult(); True(manager.Get(device.Serial, 0) is not null, "Stopping secondary display removed primary."); manager.DisposeAsync().AsTask().GetAwaiter().GetResult();
+}
+
+static void AutomationDispatcherExecutesTypedRule()
+{
+    var settings = new InMemorySettingsService(new AppSettings { AutomationRules = [new(Guid.NewGuid(), "Notify", true, AutomationTrigger.DeviceConnected, AutomationAction.Notify, AutomationRisk.Safe, "display-phone", RemotePermission.None)] });
+    var auditPath = Path.Combine(Path.GetTempPath(), $"pb-audit-{Guid.NewGuid():N}.json");
+    try { var executor = new RecordingAutomationExecutor(); var service = new AutomationService(settings, new AuditLogService(10, auditPath), executor); var results = service.DispatchAsync(new(AutomationTrigger.DeviceConnected, Device("display-phone"))).GetAwaiter().GetResult(); Equal(1, results.Count); Equal(1, executor.Count); }
+    finally { if (File.Exists(auditPath)) File.Delete(auditPath); }
+}
+static AndroidDevice Device(string name) => new(name + "-serial", name, null, null, null, DeviceConnectionType.Usb, AndroidDeviceState.Device);
 
 static void True(bool condition, string message)
 {
@@ -612,10 +634,23 @@ sealed class FailingIconAdbService : IAdbService
 sealed class FakeDisplaySessionFactory : IDeviceDisplaySessionFactory
 {
     public IDeviceDisplaySession CreateExternal(AndroidDevice device, ScrcpyLaunchOptions options) => throw new NotSupportedException();
-    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device, ScrcpyLaunchOptions options) => new FakeEmbeddedSession(device.Serial);
+    public IEmbeddedDisplaySession CreateEmbedded(AndroidDevice device, ScrcpyLaunchOptions options) => new FakeEmbeddedSession(device.Serial, options.DisplayId);
 }
 
-sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
+sealed class InMemorySettingsService(AppSettings value) : IAppSettingsService
+{
+    private AppSettings _value = value;
+    public AppSettings Load() => _value;
+    public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default) { _value = settings; return Task.CompletedTask; }
+}
+
+sealed class RecordingAutomationExecutor : IAutomationActionExecutor
+{
+    public int Count { get; private set; }
+    public Task<AutomationExecutionResult> ExecuteAsync(AutomationRule rule, AndroidDevice device, CancellationToken cancellationToken = default) { Count++; return Task.FromResult(new AutomationExecutionResult(true, "Completed")); }
+}
+
+sealed class FakeEmbeddedSession(string serial, int displayId = 0) : IEmbeddedDisplaySession
 {
     public event EventHandler<VideoFrameEventArgs>? FrameReady { add { } remove { } }
     public event EventHandler? StateChanged;
@@ -628,6 +663,7 @@ sealed class FakeEmbeddedSession(string serial) : IEmbeddedDisplaySession
     public int VideoWidth => 720;
     public int VideoHeight => 1280;
     public string DeviceName => Serial;
+    public int DisplayId { get; } = displayId;
     public Task StartAsync(CancellationToken cancellationToken = default) { IsRunning = true; StateChanged?.Invoke(this, EventArgs.Empty); return Task.CompletedTask; }
     public Task StopAsync(CancellationToken cancellationToken = default) { IsRunning = false; StateChanged?.Invoke(this, EventArgs.Empty); return Task.CompletedTask; }
     public Task SendTouchAsync(AndroidTouchAction action, long pointerId, int x, int y, float pressure = 1, uint buttons = 1, CancellationToken cancellationToken = default) => Task.CompletedTask;

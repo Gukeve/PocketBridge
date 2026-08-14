@@ -17,6 +17,9 @@ public partial class AndroidDisplayControl : UserControl
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
         nameof(Session), typeof(IEmbeddedDisplaySession), typeof(AndroidDisplayControl),
         new PropertyMetadata(null, OnSessionChanged));
+    public static readonly DependencyProperty MappingProfileProperty = DependencyProperty.Register(nameof(MappingProfile), typeof(InputProfile), typeof(AndroidDisplayControl), new PropertyMetadata(null, OnMappingChanged));
+    public static readonly DependencyProperty IsMappingEditModeProperty = DependencyProperty.Register(nameof(IsMappingEditMode), typeof(bool), typeof(AndroidDisplayControl), new PropertyMetadata(false, OnMappingChanged));
+    public event EventHandler<NormalizedPoint>? MappingPointCreated;
 
     private WriteableBitmap? _bitmap;
     private VideoFrame? _latestFrame;
@@ -40,7 +43,7 @@ public partial class AndroidDisplayControl : UserControl
     public AndroidDisplayControl()
     {
         InitializeComponent();
-        SizeChanged += (_, _) => UpdateVideoLayout();
+        SizeChanged += (_, _) => { UpdateVideoLayout(); RefreshOverlay(); };
 #if DEBUG
         MetricsOverlay.Visibility = Visibility.Visible;
 #endif
@@ -52,6 +55,9 @@ public partial class AndroidDisplayControl : UserControl
         get => (IEmbeddedDisplaySession?)GetValue(SessionProperty);
         set => SetValue(SessionProperty, value);
     }
+    public InputProfile? MappingProfile { get => (InputProfile?)GetValue(MappingProfileProperty); set => SetValue(MappingProfileProperty, value); }
+    public bool IsMappingEditMode { get => (bool)GetValue(IsMappingEditModeProperty); set => SetValue(IsMappingEditModeProperty, value); }
+    private static void OnMappingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((AndroidDisplayControl)d).RefreshOverlay();
 
     private static void OnSessionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -224,6 +230,7 @@ public partial class AndroidDisplayControl : UserControl
 
     private async void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (IsMappingEditMode) return;
         Focus();
         if (!TryMap(e.GetPosition(this), out var x, out var y) || Session is null) return;
         CaptureMouse();
@@ -265,14 +272,20 @@ public partial class AndroidDisplayControl : UserControl
 
     private async void OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (Session is null || !TryAndroidKey(e.Key, out var keyCode)) return;
+        if (Session is null) return;
+        var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.KeyboardKey && string.Equals(item.Input, e.Key.ToString(), StringComparison.OrdinalIgnoreCase));
+        if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, true); e.Handled = true; return; }
+        if (!TryAndroidKey(e.Key, out var keyCode)) return;
         await Session.SendKeyAsync(AndroidKeyAction.Down, keyCode, e.IsRepeat ? 1 : 0, MetaState());
         e.Handled = true;
     }
 
     private async void OnKeyUp(object sender, KeyEventArgs e)
     {
-        if (Session is null || !TryAndroidKey(e.Key, out var keyCode)) return;
+        if (Session is null) return;
+        var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.KeyboardKey && string.Equals(item.Input, e.Key.ToString(), StringComparison.OrdinalIgnoreCase));
+        if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, false); e.Handled = true; return; }
+        if (!TryAndroidKey(e.Key, out var keyCode)) return;
         await Session.SendKeyAsync(AndroidKeyAction.Up, keyCode, 0, MetaState());
         e.Handled = true;
     }
@@ -299,5 +312,36 @@ public partial class AndroidDisplayControl : UserControl
             _ => 0
         };
         return code != 0;
+    }
+
+    private async Task ExecuteMappedAsync(InputAction action, bool pressed)
+    {
+        if (Session is null) return;
+        if (action.Kind == InputActionKind.AndroidKey && int.TryParse(action.Value, out var keyCode)) await Session.SendKeyAsync(pressed ? AndroidKeyAction.Down : AndroidKeyAction.Up, keyCode);
+        else if (action.Kind is InputActionKind.TouchPoint or InputActionKind.VirtualJoystick && action.Point is { } point)
+        {
+            var pixel = point.ToPixels(Session.VideoWidth, Session.VideoHeight); await Session.SendTouchAsync(pressed ? AndroidTouchAction.Down : AndroidTouchAction.Up, -10, pixel.X, pixel.Y, pressed ? 1 : 0, 0);
+        }
+    }
+
+    private void OnOverlayClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsMappingEditMode || Session is null || !TryMap(e.GetPosition(this), out var x, out var y)) return;
+        MappingPointCreated?.Invoke(this, new NormalizedPoint((double)x / Session.VideoWidth, (double)y / Session.VideoHeight).Clamp()); e.Handled = true;
+    }
+
+    private void RefreshOverlay()
+    {
+        MappingOverlay.Visibility = IsMappingEditMode ? Visibility.Visible : Visibility.Collapsed; MappingOverlay.Children.Clear();
+        if (!IsMappingEditMode || Session is not { VideoWidth: > 0, VideoHeight: > 0 } || MappingProfile is null) return;
+        var imageOrigin = VideoImage.TranslatePoint(new Point(), this);
+        var scale = Math.Min(VideoImage.ActualWidth / Session.VideoWidth, VideoImage.ActualHeight / Session.VideoHeight);
+        var displayedWidth = Session.VideoWidth * scale; var displayedHeight = Session.VideoHeight * scale;
+        var left = imageOrigin.X + (VideoImage.ActualWidth - displayedWidth) / 2; var top = imageOrigin.Y + (VideoImage.ActualHeight - displayedHeight) / 2;
+        foreach (var binding in MappingProfile.Bindings.Where(item => item.Action.Point is not null))
+        {
+            var point = binding.Action.Point!.Clamp(); var marker = new Border { Width = 46, Height = 46, CornerRadius = new CornerRadius(23), Background = new SolidColorBrush(Color.FromArgb(190, 82, 106, 158)), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Child = new TextBlock { Text = binding.Input, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, TextTrimming = TextTrimming.CharacterEllipsis } };
+            Canvas.SetLeft(marker, left + point.X * displayedWidth - 23); Canvas.SetTop(marker, top + point.Y * displayedHeight - 23); MappingOverlay.Children.Add(marker);
+        }
     }
 }

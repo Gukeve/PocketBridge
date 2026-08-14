@@ -13,4 +13,5 @@ public sealed record ScrcpyLaunchOptions
     public ClipboardSyncMode ClipboardMode { get; init; } = ClipboardSyncMode.Manual;
     public bool AudioEnabled { get; init; } = true;
     public bool FullScreen { get; init; }
+    public int DisplayId { get; init; }
 }

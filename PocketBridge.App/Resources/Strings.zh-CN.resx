@@ -37,4 +37,5 @@
   <data name="AudioNotChecked" xml:space="preserve"><value>音频：请选择设备</value></data><data name="AudioSupported" xml:space="preserve"><value>音频转发：支持（{0}，API {1}）</value></data><data name="AudioUnsupported" xml:space="preserve"><value>音频转发：不支持 — {0}</value></data>
   <data name="AllStatuses" xml:space="preserve"><value>所有状态</value></data><data name="CopyDestination" xml:space="preserve"><value>复制目标路径</value></data>
   <data name="SelectDeviceForCapabilities" xml:space="preserve"><value>请选择设备以检测音频和编解码器功能。</value></data><data name="AudioAvailable" xml:space="preserve"><value>所选设备支持音频录制。</value></data>
+  <data name="EditControls" xml:space="preserve"><value>编辑控制</value></data>
 </root>

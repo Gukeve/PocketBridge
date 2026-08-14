@@ -46,6 +46,7 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
     public int VideoWidth { get; private set; }
     public int VideoHeight { get; private set; }
     public string DeviceName { get; private set; } = string.Empty;
+    public int DisplayId => _options.DisplayId;
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {

@@ -29,6 +29,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IAudioForwardingService _audio;
     private readonly IDeviceMediaCapabilityService _mediaCapabilityService;
     private readonly ILanServerService _lan;
+    private readonly IInputMappingService _inputMappings;
+    private readonly IAutomationService _automation;
+    private readonly IGamepadService _gamepads;
+    private HashSet<string> _knownDeviceSerials = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SynchronizationContext? _uiContext;
@@ -46,6 +50,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _audioStatus = "Audio: not checked";
     private bool _audioSupported;
     private DeviceMediaCapabilities? _mediaCapabilities;
+    private bool _isMappingEditMode;
 
     public MainViewModel(
         IAdbService adb,
@@ -63,7 +68,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         IGroupActionService groupActions,
         IAudioForwardingService audio,
         IDeviceMediaCapabilityService mediaCapabilityService,
-        ILanServerService lan)
+        ILanServerService lan,
+        IInputMappingService inputMappings,
+        IAutomationService automation,
+        IGamepadService gamepads)
     {
         _adb = adb;
         _scrcpy = scrcpy;
@@ -81,9 +89,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _audio = audio;
         _mediaCapabilityService = mediaCapabilityService;
         _lan = lan;
+        _inputMappings = inputMappings;
+        _automation = automation;
+        _gamepads = gamepads; _gamepads.StateChanged += OnGamepadStateChanged;
         _uiContext = SynchronizationContext.Current;
         _scrcpy.SessionChanged += OnSessionChanged;
         _embeddedSessions.SessionsChanged += OnEmbeddedSessionsChanged;
+        _lan.ControlRequested += OnRemoteControlRequested;
 
         RefreshCommand = new AsyncRelayCommand(() => RefreshDevicesAsync(true), () => !IsBusy);
         PrepareToolsCommand = new AsyncRelayCommand(PrepareToolsAsync, () => !IsBusy);
@@ -113,6 +125,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OpenAdbConsoleCommand = new RelayCommand(OpenAdbConsole, CanControl);
         OpenInputMappingCommand = new RelayCommand(_featureDialogs.ShowInputMapping);
         OpenExperimentalCommand = new RelayCommand(() => { if (SelectedDevice is { } selected) _featureDialogs.ShowExperimental(selected.Device); }, CanControl);
+        ToggleMappingEditCommand = new RelayCommand(() => IsMappingEditMode = !IsMappingEditMode, CanControl);
         SendClipboardCommand = new AsyncRelayCommand(SendClipboardToDeviceAsync, CanUseClipboard);
         CopyDeviceClipboardCommand = new AsyncRelayCommand(CopyDeviceClipboardAsync, CanUseClipboard);
         GroupHomeCommand = GroupCommand(GroupAction.Home);
@@ -164,6 +177,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand OpenAdbConsoleCommand { get; }
     public RelayCommand OpenInputMappingCommand { get; }
     public RelayCommand OpenExperimentalCommand { get; }
+    public RelayCommand ToggleMappingEditCommand { get; }
     public AsyncRelayCommand SendClipboardCommand { get; }
     public AsyncRelayCommand CopyDeviceClipboardCommand { get; }
     public AsyncRelayCommand GroupHomeCommand { get; }
@@ -219,6 +233,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
             OnPropertyChanged(nameof(SelectedClipboardMode));
             OnPropertyChanged(nameof(ShowSingleDeviceContent));
+            OnPropertyChanged(nameof(ActiveInputProfile));
             UpdateSelectionMessage();
             NotifyCommands();
             _ = RefreshAudioCapabilityAsync();
@@ -270,6 +285,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public string AudioStatus { get => _audioStatus; private set => SetProperty(ref _audioStatus, value); }
     public string AudioButtonText => SelectedDevice is { } selected && _audio.IsRunning(selected.Serial) ? LocalizationService.Current["StopAudio"] : LocalizationService.Current["StartAudio"];
+    public bool IsMappingEditMode { get => _isMappingEditMode; set => SetProperty(ref _isMappingEditMode, value); }
+    public InputProfile ActiveInputProfile => _inputMappings.Profiles.FirstOrDefault(profile => profile.TargetAlias == SelectedDevice?.FriendlyName) ?? _inputMappings.Profiles.FirstOrDefault() ?? InputProfile.Default;
+    public async Task AddMappingPointAsync(NormalizedPoint point)
+    {
+        var profile = ActiveInputProfile; var number = profile.Bindings.Count(item => item.Action.Point is not null) + 1;
+        var binding = new KeyBinding(InputSourceKind.KeyboardKey, $"Key{number}", new InputAction(InputActionKind.TouchPoint, "tap", point));
+        await _inputMappings.SaveAsync(profile with { Bindings = profile.Bindings.Append(binding).ToArray() }); OnPropertyChanged(nameof(ActiveInputProfile));
+    }
 
     private async Task RefreshAudioCapabilityAsync()
     {
@@ -321,6 +344,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             }
 
             var devices = await _adb.GetDevicesAsync(_lifetime.Token);
+            var previousSerials = _knownDeviceSerials;
             var selectedSerial = SelectedDevice?.Serial;
             var incomingSerials = devices.Select(device => device.Serial).ToHashSet(StringComparer.Ordinal);
             foreach (var removed in Devices.Where(item => !incomingSerials.Contains(item.Serial)).ToArray())
@@ -340,6 +364,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                     existing.Update(device, _profiles.Get(device.Serial), IsAnySessionRunning(device.Serial));
                 }
             }
+
+            foreach (var connected in devices.Where(item => !previousSerials.Contains(item.Serial))) _ = _automation.DispatchAsync(new(AutomationTrigger.DeviceConnected, connected), cancellationToken: _lifetime.Token);
+            foreach (var disconnectedSerial in previousSerials.Where(serial => devices.All(item => item.Serial != serial)))
+            {
+                var prior = Devices.FirstOrDefault(item => item.Serial == disconnectedSerial)?.Device ?? new AndroidDevice(disconnectedSerial, disconnectedSerial, null, null, null, DeviceConnectionType.Usb, AndroidDeviceState.Offline);
+                _ = _automation.DispatchAsync(new(AutomationTrigger.DeviceDisconnected, prior), cancellationToken: _lifetime.Token);
+            }
+            _knownDeviceSerials = incomingSerials;
 
             if (selectedSerial is not null && !incomingSerials.Contains(selectedSerial)) SelectedDevice = null;
             if (Devices.Count == 1 && SelectedDevice is null) SelectedDevice = Devices[0];
@@ -373,6 +405,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             SetStatus(LocalizationService.Current.Format("StatusStarting", selected.FriendlyName), StatusKind.Neutral);
             var profile = _profiles.Get(selected.Serial);
             await _embeddedSessions.StartAsync(selected.Device, profile.ToLaunchOptions(), _lifetime.Token);
+            await _automation.DispatchAsync(new(AutomationTrigger.SessionStarted, selected.Device), cancellationToken: _lifetime.Token);
             await _profiles.SaveAsync(profile with { LastConnected = DateTimeOffset.Now });
             selected.IsSessionRunning = true;
             OnPropertyChanged(nameof(SelectedEmbeddedSession));
@@ -616,6 +649,58 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (!_lan.IsRunning || sender is not IEmbeddedDisplaySession session) return;
         var alias = Devices.FirstOrDefault(item => item.Serial == session.Serial)?.FriendlyName ?? session.DeviceName;
         _lan.PublishFrame(alias, e.Frame);
+    }
+
+    private void OnRemoteControlRequested(object? sender, RemoteControlRequest request)
+    {
+        var device = Devices.FirstOrDefault(item => string.Equals(item.FriendlyName, request.TargetAlias, StringComparison.Ordinal));
+        var session = device is null ? null : _embeddedSessions.Get(device.Serial);
+        if (session is not { IsRunning: true }) return;
+        _ = ExecuteRemoteControlAsync(session, request);
+    }
+
+    private async Task ExecuteRemoteControlAsync(IEmbeddedDisplaySession session, RemoteControlRequest request)
+    {
+        try
+        {
+            var x = Math.Clamp((int)Math.Round(request.X * session.VideoWidth), 0, Math.Max(0, session.VideoWidth - 1));
+            var y = Math.Clamp((int)Math.Round(request.Y * session.VideoHeight), 0, Math.Max(0, session.VideoHeight - 1));
+            switch (request.Action.ToLowerInvariant())
+            {
+                case "tap": await session.SendTouchAsync(AndroidTouchAction.Down, 0, x, y, cancellationToken: _lifetime.Token); await session.SendTouchAsync(AndroidTouchAction.Up, 0, x, y, 0, cancellationToken: _lifetime.Token); break;
+                case "touchdown": await session.SendTouchAsync(AndroidTouchAction.Down, 0, x, y, cancellationToken: _lifetime.Token); break;
+                case "touchup": await session.SendTouchAsync(AndroidTouchAction.Up, 0, x, y, 0, cancellationToken: _lifetime.Token); break;
+                case "key": await session.SendKeyAsync(AndroidKeyAction.Down, request.KeyCode, cancellationToken: _lifetime.Token); await session.SendKeyAsync(AndroidKeyAction.Up, request.KeyCode, cancellationToken: _lifetime.Token); break;
+                case "back": await SendRemoteKeyAsync(session, 4); break;
+                case "home": await SendRemoteKeyAsync(session, 3); break;
+                case "recents": await SendRemoteKeyAsync(session, 187); break;
+            }
+        }
+        catch (Exception exception) { SetStatus(exception.Message, StatusKind.Warning); }
+    }
+
+    private async Task SendRemoteKeyAsync(IEmbeddedDisplaySession session, int keyCode)
+    {
+        await session.SendKeyAsync(AndroidKeyAction.Down, keyCode, cancellationToken: _lifetime.Token);
+        await session.SendKeyAsync(AndroidKeyAction.Up, keyCode, cancellationToken: _lifetime.Token);
+    }
+
+    private void OnGamepadStateChanged(object? sender, GamepadState state)
+    {
+        var session = SelectedEmbeddedSession; if (session is not { IsRunning: true }) return;
+        foreach (var binding in ActiveInputProfile.Bindings.Where(item => item.SourceKind is InputSourceKind.GamepadButton or InputSourceKind.GamepadAxis))
+        {
+            double magnitude = binding.Input.ToUpperInvariant() switch { "LEFTX" => state.LeftX, "LEFTY" => state.LeftY, "RIGHTX" => state.RightX, "RIGHTY" => state.RightY, "LT" => state.LeftTrigger, "RT" => state.RightTrigger, _ => 0 };
+            if (binding.SourceKind == InputSourceKind.GamepadButton && int.TryParse(binding.Input, out var mask)) magnitude = (state.Buttons & mask) != 0 ? 1 : 0;
+            if (Math.Abs(magnitude) < binding.DeadZone) continue;
+            _ = ExecuteGamepadActionAsync(session, binding.Action, magnitude);
+        }
+    }
+
+    private static async Task ExecuteGamepadActionAsync(IEmbeddedDisplaySession session, InputAction action, double magnitude)
+    {
+        if (action.Kind == InputActionKind.AndroidKey && int.TryParse(action.Value, out var key)) { await session.SendKeyAsync(AndroidKeyAction.Down, key); await session.SendKeyAsync(AndroidKeyAction.Up, key); }
+        else if (action.Kind is InputActionKind.TouchPoint or InputActionKind.VirtualJoystick && action.Point is { } point) { var pixel = point.ToPixels(session.VideoWidth, session.VideoHeight); await session.SendTouchAsync(AndroidTouchAction.Down, -11, pixel.X, pixel.Y, (float)Math.Abs(magnitude)); await session.SendTouchAsync(AndroidTouchAction.Up, -11, pixel.X, pixel.Y, 0); }
     }
 
     private void OnClipboardChanged(object? sender, DeviceClipboardEventArgs e)
@@ -886,7 +971,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         RefreshCommand.NotifyCanExecuteChanged(); PrepareToolsCommand.NotifyCanExecuteChanged(); OpenSettingsCommand.NotifyCanExecuteChanged(); ConfigureProfileCommand.NotifyCanExecuteChanged(); StartMultiViewCommand.NotifyCanExecuteChanged(); ConnectCommand.NotifyCanExecuteChanged(); OpenExternalCommand.NotifyCanExecuteChanged(); StopCommand.NotifyCanExecuteChanged(); RestartCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged(); HomeCommand.NotifyCanExecuteChanged(); RecentsCommand.NotifyCanExecuteChanged(); VolumeUpCommand.NotifyCanExecuteChanged(); VolumeDownCommand.NotifyCanExecuteChanged(); PowerCommand.NotifyCanExecuteChanged(); RebootCommand.NotifyCanExecuteChanged(); OpenFilesCommand.NotifyCanExecuteChanged(); InstallApkCommand.NotifyCanExecuteChanged(); WifiCommand.NotifyCanExecuteChanged(); ScreenshotCommand.NotifyCanExecuteChanged();
-        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); ToggleAudioCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged(); OpenExperimentalCommand.NotifyCanExecuteChanged();
+        SendClipboardCommand.NotifyCanExecuteChanged(); CopyDeviceClipboardCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); ToggleRecordingCommand.NotifyCanExecuteChanged(); ToggleAudioCommand.NotifyCanExecuteChanged(); OpenApplicationsCommand.NotifyCanExecuteChanged(); OpenDeviceInformationCommand.NotifyCanExecuteChanged(); OpenAdbConsoleCommand.NotifyCanExecuteChanged(); OpenExperimentalCommand.NotifyCanExecuteChanged(); ToggleMappingEditCommand.NotifyCanExecuteChanged();
         GroupHomeCommand.NotifyCanExecuteChanged(); GroupBackCommand.NotifyCanExecuteChanged(); GroupRecentsCommand.NotifyCanExecuteChanged(); GroupVolumeUpCommand.NotifyCanExecuteChanged(); GroupVolumeDownCommand.NotifyCanExecuteChanged(); GroupPowerCommand.NotifyCanExecuteChanged(); GroupRebootCommand.NotifyCanExecuteChanged(); GroupScreenshotCommand.NotifyCanExecuteChanged(); GroupSendFilesCommand.NotifyCanExecuteChanged(); GroupInstallApkCommand.NotifyCanExecuteChanged();
     }
 
@@ -904,6 +989,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         _scrcpy.SessionChanged -= OnSessionChanged;
         _embeddedSessions.SessionsChanged -= OnEmbeddedSessionsChanged;
+        _lan.ControlRequested -= OnRemoteControlRequested;
+        _gamepads.StateChanged -= OnGamepadStateChanged;
         _clipboardTimer.Stop();
         _recordingTimer.Stop();
         _recordings.Changed -= OnRecordingChanged;

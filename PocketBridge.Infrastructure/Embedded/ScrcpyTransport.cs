@@ -99,6 +99,7 @@ internal sealed class ScrcpyTransport : IAsyncDisposable
             "power_off_on_close=false"
         };
         if (_options.MaxSize is > 0) serverArguments.Add($"max_size={_options.MaxSize}");
+        if (_options.DisplayId != 0) serverArguments.Add($"display_id={_options.DisplayId}");
         if (_options.MaxFps is > 0) serverArguments.Add($"max_fps={_options.MaxFps}");
         if (!string.IsNullOrWhiteSpace(_options.VideoBitRate))
         {

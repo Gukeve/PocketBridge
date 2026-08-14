@@ -48,4 +48,5 @@
   <data name="AudioNotChecked" xml:space="preserve"><value>Audio: select a device</value></data><data name="AudioSupported" xml:space="preserve"><value>Audio forwarding: supported ({0}, API {1})</value></data><data name="AudioUnsupported" xml:space="preserve"><value>Audio forwarding: unsupported — {0}</value></data>
   <data name="AllStatuses" xml:space="preserve"><value>All statuses</value></data><data name="CopyDestination" xml:space="preserve"><value>Copy destination</value></data>
   <data name="SelectDeviceForCapabilities" xml:space="preserve"><value>Select a device to detect audio and codec capabilities.</value></data><data name="AudioAvailable" xml:space="preserve"><value>Audio recording is available on the selected device.</value></data>
+  <data name="EditControls" xml:space="preserve"><value>Edit controls</value></data>
 </root>

@@ -104,11 +104,12 @@ P2 code status is COMPLETE. P2 hardware acceptance remains PARTIAL because no ph
 
 - **Implemented foundation:** versioned portable input profiles, normalized touch/orientation transforms, keyboard/mouse/gamepad binding model, background XInput discovery and dead zones.
 - **Implemented capability layer:** Automatic/Standard/HID backend selection with safe fallback, UHID/OTG states, explicit separate OTG process, display listing and guarded official-scrcpy virtual-display launch presets.
-- **Implemented view-only LAN milestone:** disabled by default, localhost/private explicit bind, generated expiring/revocable token, embedded responsive canvas client, live raw-frame WebSocket publication and CSP/no-store headers.
+- **Implemented LAN security boundary:** disabled by default, explicit private bind and Origin, expiring/revocable hashed token, per-message permission/expiry/Origin/monotonic-sequence checks, immediate revoke, typed control routing by server-owned alias and CSP/no-store headers.
 - **Implemented permission foundation:** typed remote permissions, typed automation triggers/actions/risk classes, destructive opt-in policy and bounded sensitive-data-minimized audit log.
-- **Still experimental/incomplete:** edit-controls overlay and runtime mapping execution; verified gamepad mapping; authenticated LAN control; Origin/replay protections needed before control; full automation trigger/action executor; multi-display embedded session tree; desktop app picker workflow; persistent audit UI.
+- **Implemented in the current checkpoint:** embedded edit-controls overlay aligned to the letterboxed video, persisted normalized points, actual keyboard/touch runtime execution, and atomically persisted bounded audit records.
+- **Still experimental/incomplete:** verified physical gamepad mapping; automation trigger/action executor; multi-display embedded session tree and secondary-display workflow; persistent audit viewer UI; full P3 RU/EN/zh-CN localization; adversarial LAN tests.
 
-P3 code status is **PARTIAL**. See `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`; do not treat the foundation as production-grade remote control.
+P3 code status is **PARTIAL**. The typed automation dispatcher/executor, display-scoped embedded sessions and persistent audit page now exist, but drag/drop regions/joysticks, complete P3 localization, secondary-display app workflow and adversarial LAN coverage remain open. See `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`.
 
 ## First implementation slice
 

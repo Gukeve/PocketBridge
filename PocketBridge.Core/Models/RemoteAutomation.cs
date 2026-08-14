@@ -4,7 +4,9 @@ namespace PocketBridge.Core.Models;
 public enum AutomationRisk { Safe, Interactive, Destructive }
 public enum AutomationTrigger { DeviceConnected, DeviceDisconnected, SessionStarted, BatteryBelowThreshold, WifiAvailable }
 public enum AutomationAction { StartMirroring, TakeScreenshot, StartRecording, StopRecording, LaunchApp, Notify, SendKey, TransferFile, Reboot, Uninstall, ClearData }
-public sealed record AutomationRule(Guid Id, string Name, bool Enabled, AutomationTrigger Trigger, AutomationAction Action, AutomationRisk Risk, string? TargetAlias, RemotePermission GrantedPermissions, DateTimeOffset? LastRun = null, string? LastResult = null);
+public sealed record AutomationRule(Guid Id, string Name, bool Enabled, AutomationTrigger Trigger, AutomationAction Action, AutomationRisk Risk, string? TargetAlias, RemotePermission GrantedPermissions, DateTimeOffset? LastRun = null, string? LastResult = null, string? Argument = null);
+public sealed record AutomationEvent(AutomationTrigger Trigger, AndroidDevice Device, int? BatteryPercent = null, string? WifiSsid = null);
+public sealed record AutomationExecutionResult(bool Success, string Result);
 public sealed record AuditRecord(DateTimeOffset Timestamp, string Actor, string DeviceAlias, string Action, string Result);
 public sealed record RemoteSession(Guid Id, string TokenHash, DateTimeOffset ExpiresAt, RemotePermission Permissions, string Actor)
 {

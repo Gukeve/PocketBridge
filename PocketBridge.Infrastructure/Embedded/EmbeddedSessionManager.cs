@@ -9,26 +9,27 @@ public sealed class EmbeddedSessionManager(IDeviceDisplaySessionFactory factory)
     private readonly SemaphoreSlim _gate = new(1, 1);
     public event EventHandler? SessionsChanged;
     public IReadOnlyCollection<IEmbeddedDisplaySession> Sessions { get { lock (_sessions) return _sessions.Values.ToArray(); } }
-    public IEmbeddedDisplaySession? Get(string serial) { lock (_sessions) return _sessions.GetValueOrDefault(serial); }
+    public IEmbeddedDisplaySession? Get(string serial, int displayId = 0) { lock (_sessions) return _sessions.GetValueOrDefault(Key(serial, displayId)); }
 
     public async Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions? options = null, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var existing = Get(device.Serial);
+            var launchOptions = options ?? new ScrcpyLaunchOptions();
+            var existing = Get(device.Serial, launchOptions.DisplayId);
             if (existing is not null)
             {
                 if (!existing.IsRunning) await existing.StartAsync(cancellationToken).ConfigureAwait(false);
                 return existing;
             }
-            var session = factory.CreateEmbedded(device, options ?? new ScrcpyLaunchOptions());
+            var session = factory.CreateEmbedded(device, launchOptions);
             session.StateChanged += OnStateChanged;
-            lock (_sessions) _sessions.Add(device.Serial, session);
+            lock (_sessions) _sessions.Add(Key(device.Serial, launchOptions.DisplayId), session);
             try { await session.StartAsync(cancellationToken).ConfigureAwait(false); }
             catch
             {
-                lock (_sessions) _sessions.Remove(device.Serial);
+                lock (_sessions) _sessions.Remove(Key(device.Serial, launchOptions.DisplayId));
                 session.StateChanged -= OnStateChanged;
                 await session.DisposeAsync().ConfigureAwait(false);
                 throw;
@@ -39,10 +40,10 @@ public sealed class EmbeddedSessionManager(IDeviceDisplaySessionFactory factory)
         finally { _gate.Release(); }
     }
 
-    public async Task StopAsync(string serial, CancellationToken cancellationToken = default)
+    public async Task StopAsync(string serial, int displayId = 0, CancellationToken cancellationToken = default)
     {
         IEmbeddedDisplaySession? session;
-        lock (_sessions) { _sessions.Remove(serial, out session); }
+        lock (_sessions) { _sessions.Remove(Key(serial, displayId), out session); }
         if (session is null) return;
         session.StateChanged -= OnStateChanged;
         await session.DisposeAsync().ConfigureAwait(false);
@@ -50,6 +51,7 @@ public sealed class EmbeddedSessionManager(IDeviceDisplaySessionFactory factory)
     }
 
     private void OnStateChanged(object? sender, EventArgs e) => SessionsChanged?.Invoke(this, EventArgs.Empty);
+    private static string Key(string serial, int displayId) => $"{serial}\u001f{displayId}";
 
     public async ValueTask DisposeAsync()
     {

@@ -27,6 +27,7 @@ public interface IEmbeddedDisplaySession : IDeviceDisplaySession, IAsyncDisposab
     int VideoWidth { get; }
     int VideoHeight { get; }
     string DeviceName { get; }
+    int DisplayId { get; }
     Task SendTouchAsync(AndroidTouchAction action, long pointerId, int x, int y, float pressure = 1f, uint buttons = 1, CancellationToken cancellationToken = default);
     Task SendKeyAsync(AndroidKeyAction action, int keyCode, int repeat = 0, int metaState = 0, CancellationToken cancellationToken = default);
     Task SendScrollAsync(int x, int y, float horizontal, float vertical, uint buttons = 0, CancellationToken cancellationToken = default);
@@ -46,9 +47,9 @@ public interface IEmbeddedSessionManager : IAsyncDisposable
 {
     event EventHandler? SessionsChanged;
     IReadOnlyCollection<IEmbeddedDisplaySession> Sessions { get; }
-    IEmbeddedDisplaySession? Get(string serial);
+    IEmbeddedDisplaySession? Get(string serial, int displayId = 0);
     Task<IEmbeddedDisplaySession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions? options = null, CancellationToken cancellationToken = default);
-    Task StopAsync(string serial, CancellationToken cancellationToken = default);
+    Task StopAsync(string serial, int displayId = 0, CancellationToken cancellationToken = default);
 }
 
 public interface IDeviceDisplaySessionFactory
