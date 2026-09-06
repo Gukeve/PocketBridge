@@ -9,7 +9,9 @@
              MouseRightButtonDown="OnMouseRightButtonDown"
              KeyDown="OnKeyDown" KeyUp="OnKeyUp" TextInput="OnTextInput">
     <Grid ClipToBounds="True">
-        <Image x:Name="VideoImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+        <Image x:Name="VideoImage" Stretch="Uniform"
+               HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="8"
+               RenderOptions.BitmapScalingMode="LowQuality" />
         <Canvas x:Name="MappingOverlay" Background="#22000000" Visibility="Collapsed" MouseLeftButtonDown="OnOverlayClick" Panel.ZIndex="5" />
         <Border x:Name="EditorToolbar" Panel.ZIndex="7" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="8" Padding="7" CornerRadius="9" Background="#EE111827" BorderBrush="#526A9E" BorderThickness="1">
             <StackPanel Orientation="Horizontal">

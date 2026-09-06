@@ -17,7 +17,7 @@
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal"><TextBlock Text="{loc:Loc AppName}" FontSize="24" FontWeight="SemiBold" /><Border Margin="12,2,0,2" Padding="9,3" CornerRadius="9" Background="#172137"><TextBlock Text="MVP" Foreground="{StaticResource AccentHoverBrush}" FontSize="11" FontWeight="SemiBold" /></Border></StackPanel>
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="{loc:Loc AppName}" FontSize="24" FontWeight="SemiBold" /><Border Margin="12,2,0,2" Padding="9,3" CornerRadius="9" Background="#172137"><TextBlock Text="RC" Foreground="{StaticResource AccentHoverBrush}" FontSize="11" FontWeight="SemiBold" /></Border></StackPanel>
                     <TextBlock Text="{loc:Loc Subtitle}" Margin="0,3,0,0" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -143,7 +143,7 @@
                                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                     <StackPanel x:Name="PreviewHeader" Grid.Row="0">
                                         <TextBlock Text="{loc:Loc EmbeddedPreview}" FontSize="17" FontWeight="SemiBold" />
-                                        <TextBlock Text="scrcpy-server 4.1 · H.264 · встроенный режим" Margin="0,5,0,8" Foreground="{StaticResource SecondaryTextBrush}" FontSize="11" />
+                                        <TextBlock Text="{loc:Loc EmbeddedModeDetails}" Margin="0,5,0,8" Foreground="{StaticResource SecondaryTextBrush}" FontSize="11" />
                                     </StackPanel>
                                     <Border Grid.Row="1" Margin="0,0,0,8" CornerRadius="10" BorderBrush="#3A465F" BorderThickness="1" Background="#05070B" ClipToBounds="True">
                                         <controls:AndroidDisplayControl Session="{Binding SelectedEmbeddedSession}" MappingProfile="{Binding ActiveInputProfile}" IsMappingEditMode="{Binding IsMappingEditMode}" MappingProfileEdited="MappingProfile_Edited" />

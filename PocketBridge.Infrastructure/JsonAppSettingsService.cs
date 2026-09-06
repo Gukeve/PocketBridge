@@ -10,9 +10,11 @@ public sealed class JsonAppSettingsService : IAppSettingsService
 
     public JsonAppSettingsService(string? settingsPath = null)
     {
+        var dataRoot = Environment.GetEnvironmentVariable("POCKETBRIDGE_DATA_ROOT");
         _settingsPath = settingsPath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "PocketBridge",
+            string.IsNullOrWhiteSpace(dataRoot)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PocketBridge")
+                : Path.GetFullPath(dataRoot),
             "settings.json");
     }
 

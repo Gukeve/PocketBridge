@@ -34,7 +34,7 @@
                     <Grid><TextBlock Text="{loc:Loc Shortcuts}" FontSize="20" FontWeight="SemiBold" /><Button HorizontalAlignment="Right" Style="{StaticResource BaseButton}" Content="{loc:Loc ResetDefaults}" Click="ResetShortcuts_Click" /></Grid>
                     <TextBlock Text="{loc:Loc ShortcutsHelp}" Margin="0,7,0,12" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
                     <DataGrid x:Name="ShortcutGrid" ItemsSource="{Binding ShortcutItems}" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MinHeight="260" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}">
-                        <DataGrid.Columns><DataGridTextColumn Header="Action" Binding="{Binding Action}" IsReadOnly="True" Width="*" /><DataGridTextColumn Header="Scope" Binding="{Binding Scope}" IsReadOnly="True" Width="*" /><DataGridTextColumn Header="Gesture" Binding="{Binding Gesture, UpdateSourceTrigger=PropertyChanged}" Width="*" /></DataGrid.Columns>
+                        <DataGrid.Columns><DataGridTextColumn Header="{loc:Loc ShortcutAction}" Binding="{Binding Action}" IsReadOnly="True" Width="*" /><DataGridTextColumn Header="{loc:Loc ShortcutScope}" Binding="{Binding Scope}" IsReadOnly="True" Width="*" /><DataGridTextColumn Header="{loc:Loc ShortcutGesture}" Binding="{Binding Gesture, UpdateSourceTrigger=PropertyChanged}" Width="*" /></DataGrid.Columns>
                     </DataGrid>
 
                     <Separator Margin="0,24,0,20" Background="{StaticResource BorderBrush}" />

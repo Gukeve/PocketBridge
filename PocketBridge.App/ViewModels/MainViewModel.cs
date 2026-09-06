@@ -47,7 +47,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool _adbAvailable;
     private string _statusMessage = LocalizationService.Current["StatusRefreshing"];
     private StatusKind _statusKind = StatusKind.Neutral;
-    private string _audioStatus = "Audio: not checked";
+    private string _audioStatus = LocalizationService.Current["AudioNotChecked"];
     private bool _audioSupported;
     private DeviceMediaCapabilities? _mediaCapabilities;
     private bool _isMappingEditMode;
@@ -588,9 +588,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             if (_audio.IsRunning(selected.Serial)) await _audio.StopAsync(selected.Serial); else await _audio.StartAsync(selected.Device);
             var capability = await _audio.DetectAsync(selected.Serial);
-            AudioStatus = capability.IsSupported ? $"Audio: {capability.Codec}, API {capability.AndroidApi}" : $"Audio unavailable: {capability.Reason}";
+            AudioStatus = capability.IsSupported ? LocalizationService.Current.Format("AudioSupported", capability.Codec, capability.AndroidApi) : LocalizationService.Current.Format("AudioUnsupported", capability.Reason ?? LocalizationService.Current["Unknown"]);
         }
-        catch (Exception exception) { AudioStatus = $"Audio unavailable: {exception.Message}"; }
+        catch (Exception exception) { AudioStatus = LocalizationService.Current.Format("AudioUnsupported", exception.Message); }
         OnPropertyChanged(nameof(AudioButtonText));
     }
 

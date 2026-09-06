@@ -97,6 +97,16 @@ public sealed class ScrcpyService : IScrcpyService
         await holder.Completion.Task.ConfigureAwait(false);
     }
 
+    public async Task StopAllAsync()
+    {
+        foreach (var key in _sessions.Keys.ToArray())
+        {
+            if (!_sessions.TryGetValue(key, out var holder)) continue;
+            if (!holder.Process.HasExited) holder.Process.Kill(true);
+        }
+        await Task.WhenAll(_sessions.Values.Select(holder => holder.Completion.Task)).ConfigureAwait(false);
+    }
+
     public bool IsRunning(string serial, int displayId = 0) =>
         _sessions.TryGetValue(Key(serial, displayId), out var holder) && holder.Session.IsRunning && !holder.Process.HasExited;
 

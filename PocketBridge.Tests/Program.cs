@@ -53,11 +53,14 @@ var tests = new (string Name, Action Run)[]
     ,("Embedded sessions are isolated by display", EmbeddedSessionsAreDisplayScoped)
     ,("Automation dispatcher executes typed matching rules", AutomationDispatcherExecutesTypedRule)
     ,("Visible video coordinates survive letterboxing", VisibleVideoCoordinatesSurviveLetterboxing)
+    ,("Centered viewport mapping survives resize fullscreen and DPI", CenteredViewportMappingSurvivesLayoutChanges)
     ,("Input action geometry normalizes bounds", InputActionGeometryNormalizesBounds)
     ,("LAN control rejects origin permission and replay attacks", LanControlRejectsAdversarialMessages)
     ,("LAN control applies bounded request rate", LanControlAppliesRateLimit)
     ,("Audit log sanitizes sensitive identifiers", AuditLogSanitizesIdentifiers)
     ,("P3 localization keys have EN RU zh-CN parity", P3LocalizationKeysHaveParity)
+    ,("All localization keys have EN RU zh-CN parity", AllLocalizationKeysHaveParity)
+    ,("Clean data root starts with default settings", CleanDataRootStartsWithDefaults)
     ,("XInput axes and triggers normalize across controllers", XInputValuesNormalize)
     ,("Automation permissions are action specific", AutomationPermissionsAreActionSpecific)
     ,("Input profile file import export round-trips geometry", InputProfileFileRoundTripsGeometry)
@@ -600,6 +603,35 @@ static void VisibleVideoCoordinatesSurviveLetterboxing()
     var control = topBars.ToControl(new(.25, .75)); var roundTrip = topBars.ToNormalized(control.X, control.Y)!; Near(.25, roundTrip.X, .001); Near(.75, roundTrip.Y, .001);
 }
 
+static void CenteredViewportMappingSurvivesLayoutChanges()
+{
+    static void AssertCenteredRoundTrip(double hostWidth, double hostHeight, double videoWidth, double videoHeight, double originX = 0, double originY = 0)
+    {
+        var rect = InputCoordinateMapper.Fit(hostWidth, hostHeight, videoWidth, videoHeight, originX, originY);
+        Near(originX + (hostWidth - rect.Width) / 2, rect.Left, .001);
+        Near(originY + (hostHeight - rect.Height) / 2, rect.Top, .001);
+        foreach (var point in new[] { new NormalizedPoint(0, 0), new(.25, .75), new(.5, .5), new(1, 1) })
+        {
+            var control = rect.ToControl(point);
+            var mapped = rect.ToNormalized(control.X, control.Y) ?? throw new InvalidOperationException("Centered video point fell outside the visible rectangle.");
+            Near(point.X, mapped.X, .001); Near(point.Y, mapped.Y, .001);
+        }
+    }
+
+    AssertCenteredRoundTrip(1200, 700, 1080, 2400);       // portrait, side letterbox
+    AssertCenteredRoundTrip(900, 1200, 2400, 1080);       // landscape, top/bottom letterbox
+    AssertCenteredRoundTrip(640, 360, 1080, 2400, 8, 8); // resized host with control padding
+    AssertCenteredRoundTrip(1920, 1080, 2400, 1080);      // fullscreen-sized host
+
+    var logical = InputCoordinateMapper.Fit(800, 500, 1080, 2400);
+    var dpiScaled = InputCoordinateMapper.Fit(1200, 750, 1080, 2400);
+    var logicalPoint = logical.ToControl(new(.37, .62));
+    var scaledPoint = dpiScaled.ToControl(new(.37, .62));
+    var logicalMapped = logical.ToNormalized(logicalPoint.X, logicalPoint.Y)!;
+    var scaledMapped = dpiScaled.ToNormalized(scaledPoint.X, scaledPoint.Y)!;
+    Near(logicalMapped.X, scaledMapped.X, .001); Near(logicalMapped.Y, scaledMapped.Y, .001);
+}
+
 static void InputActionGeometryNormalizesBounds()
 {
     var action = new InputAction(InputActionKind.TouchRegion, "region", Region: new(new(1.2, .9), new(-.2, .1)), Radius: 1, DurationMs: 10, Sensitivity: 99).Normalize();
@@ -608,18 +640,19 @@ static void InputActionGeometryNormalizesBounds()
 
 static void LanControlRejectsAdversarialMessages()
 {
-    var now = DateTimeOffset.UtcNow; var session = new RemoteSession(Guid.NewGuid(), "hash", now.AddMinutes(1), RemotePermission.ViewScreen | RemotePermission.ControlTouch, "Peer"); var gate = new RemoteControlSecurityGate("http://192.168.1.20:27183");
-    True(gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Valid control message was denied.");
-    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Duplicate sequence/nonce was accepted.");
-    True(!gate.Validate(session, Guid.NewGuid(), "http://192.168.1.20:27183", "tap", 2, "nonce-0000000009", now.ToUnixTimeMilliseconds(), now).Allowed, "Token/session mismatch was accepted.");
+    const string allowedOrigin = "http://localhost:27183";
+    var now = DateTimeOffset.UtcNow; var session = new RemoteSession(Guid.NewGuid(), "hash", now.AddMinutes(1), RemotePermission.ViewScreen | RemotePermission.ControlTouch, "Peer"); var gate = new RemoteControlSecurityGate(allowedOrigin);
+    True(gate.Validate(session, session.Id, allowedOrigin, "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Valid control message was denied.");
+    True(!gate.Validate(session, session.Id, allowedOrigin, "tap", 1, "nonce-0000000001", now.ToUnixTimeMilliseconds(), now).Allowed, "Duplicate sequence/nonce was accepted.");
+    True(!gate.Validate(session, Guid.NewGuid(), allowedOrigin, "tap", 2, "nonce-0000000009", now.ToUnixTimeMilliseconds(), now).Allowed, "Token/session mismatch was accepted.");
     True(!gate.Validate(session, session.Id, "http://evil.invalid", "tap", 2, "nonce-0000000002", now.ToUnixTimeMilliseconds(), now).Allowed, "Unexpected Origin was accepted.");
     True(!gate.Validate(session, session.Id, null, "tap", 2, "nonce-0000000003", now.ToUnixTimeMilliseconds(), now).Allowed, "Missing Origin was accepted.");
-    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "key", 2, "nonce-0000000004", now.ToUnixTimeMilliseconds(), now).Allowed, "Permission escalation was accepted.");
-    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "install", 2, "nonce-0000000005", now.ToUnixTimeMilliseconds(), now).Allowed, "Unknown/disallowed command was accepted.");
-    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000006", now.AddMinutes(-2).ToUnixTimeMilliseconds(), now).Allowed, "Stale timestamp was accepted.");
-    True(!gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000010", now.AddMinutes(2).ToUnixTimeMilliseconds(), now).Allowed, "Future timestamp was accepted.");
-    True(!gate.Validate(session with { ExpiresAt = now }, session.Id, "http://192.168.1.20:27183", "tap", 2, "nonce-0000000007", now.ToUnixTimeMilliseconds(), now).Allowed, "Expired session was accepted.");
-    gate.Revoke(session.Id); True(gate.Validate(session, session.Id, "http://192.168.1.20:27183", "tap", 1, "nonce-0000000008", now.ToUnixTimeMilliseconds(), now).Allowed, "Revoked gate state was not cleared for a newly authenticated session state.");
+    True(!gate.Validate(session, session.Id, allowedOrigin, "key", 2, "nonce-0000000004", now.ToUnixTimeMilliseconds(), now).Allowed, "Permission escalation was accepted.");
+    True(!gate.Validate(session, session.Id, allowedOrigin, "install", 2, "nonce-0000000005", now.ToUnixTimeMilliseconds(), now).Allowed, "Unknown/disallowed command was accepted.");
+    True(!gate.Validate(session, session.Id, allowedOrigin, "tap", 2, "nonce-0000000006", now.AddMinutes(-2).ToUnixTimeMilliseconds(), now).Allowed, "Stale timestamp was accepted.");
+    True(!gate.Validate(session, session.Id, allowedOrigin, "tap", 2, "nonce-0000000010", now.AddMinutes(2).ToUnixTimeMilliseconds(), now).Allowed, "Future timestamp was accepted.");
+    True(!gate.Validate(session with { ExpiresAt = now }, session.Id, allowedOrigin, "tap", 2, "nonce-0000000007", now.ToUnixTimeMilliseconds(), now).Allowed, "Expired session was accepted.");
+    gate.Revoke(session.Id); True(gate.Validate(session, session.Id, allowedOrigin, "tap", 1, "nonce-0000000008", now.ToUnixTimeMilliseconds(), now).Allowed, "Revoked gate state was not cleared for a newly authenticated session state.");
 }
 
 static void LanControlAppliesRateLimit()
@@ -638,6 +671,29 @@ static void P3LocalizationKeysHaveParity()
 {
     static Dictionary<string, string> Load(string path) => XDocument.Load(path).Descendants("data").Where(item => item.Attribute("name")?.Value.StartsWith("P3_", StringComparison.Ordinal) == true).ToDictionary(item => item.Attribute("name")!.Value, item => item.Element("value")?.Value ?? string.Empty, StringComparer.Ordinal);
     var root = Path.Combine(Directory.GetCurrentDirectory(), "PocketBridge.App", "Resources"); var en = Load(Path.Combine(root, "Strings.resx")); var ru = Load(Path.Combine(root, "Strings.ru-RU.resx")); var zh = Load(Path.Combine(root, "Strings.zh-CN.resx")); Equal(string.Join('|', en.Keys.Order()), string.Join('|', ru.Keys.Order())); Equal(string.Join('|', en.Keys.Order()), string.Join('|', zh.Keys.Order())); True(en.Values.All(value => !string.IsNullOrWhiteSpace(value)) && ru.Values.All(value => !string.IsNullOrWhiteSpace(value)) && zh.Values.All(value => !string.IsNullOrWhiteSpace(value)), "A P3 translation is empty.");
+}
+static void AllLocalizationKeysHaveParity()
+{
+    static Dictionary<string, string> Load(string path) => XDocument.Load(path).Descendants("data").ToDictionary(item => item.Attribute("name")!.Value, item => item.Element("value")?.Value ?? string.Empty, StringComparer.Ordinal);
+    var root = Path.Combine(Directory.GetCurrentDirectory(), "PocketBridge.App", "Resources"); var en = Load(Path.Combine(root, "Strings.resx")); var ru = Load(Path.Combine(root, "Strings.ru-RU.resx")); var zh = Load(Path.Combine(root, "Strings.zh-CN.resx"));
+    Equal(string.Join('|', en.Keys.Order()), string.Join('|', ru.Keys.Order())); Equal(string.Join('|', en.Keys.Order()), string.Join('|', zh.Keys.Order()));
+    True(en.Values.All(value => !string.IsNullOrWhiteSpace(value)) && ru.Values.All(value => !string.IsNullOrWhiteSpace(value)) && zh.Values.All(value => !string.IsNullOrWhiteSpace(value)), "A localized value is empty.");
+}
+static void CleanDataRootStartsWithDefaults()
+{
+    var root = Path.Combine(Path.GetTempPath(), $"pb-clean-data-{Guid.NewGuid():N}"); var previous = Environment.GetEnvironmentVariable("POCKETBRIDGE_DATA_ROOT");
+    try
+    {
+        Environment.SetEnvironmentVariable("POCKETBRIDGE_DATA_ROOT", root);
+        var settings = new JsonAppSettingsService().Load();
+        True(string.IsNullOrWhiteSpace(settings.ToolsDirectory), "Clean data root inherited a configured runtime path.");
+        var audit = new AuditLogService(); True(audit.Items.Count == 0, "Clean data root inherited audit records.");
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("POCKETBRIDGE_DATA_ROOT", previous);
+        if (Directory.Exists(root)) Directory.Delete(root, true);
+    }
 }
 static void XInputValuesNormalize() { Near(-1, GamepadNormalization.Axis(short.MinValue), .0001); Near(1, GamepadNormalization.Axis(short.MaxValue), .0001); Near(0, GamepadNormalization.Axis(0), .0001); Near(0, GamepadNormalization.Trigger(0), .0001); Near(1, GamepadNormalization.Trigger(byte.MaxValue), .0001); for (var controller = 1; controller <= 4; controller++) { var state = new GamepadState(controller, true, 0, 0, 0, 0, 0, 0, 0); Equal(controller, state.Controller); } }
 static void AutomationPermissionsAreActionSpecific() { var home = new AutomationRule(Guid.NewGuid(), "Home", true, AutomationTrigger.DeviceConnected, AutomationAction.Home, AutomationRisk.Interactive, null, RemotePermission.ViewScreen); True(!AutomationPermissionPolicy.IsAllowed(home, false), "View permission authorized device buttons."); True(AutomationPermissionPolicy.IsAllowed(home with { GrantedPermissions = RemotePermission.DeviceButtons }, false), "Correct device-button permission was rejected."); var uninstall = home with { Action = AutomationAction.Uninstall, Risk = AutomationRisk.Destructive, GrantedPermissions = RemotePermission.ApplicationManager }; True(!AutomationPermissionPolicy.IsAllowed(uninstall, false), "Destructive action ran without opt-in."); True(AutomationPermissionPolicy.IsAllowed(uninstall, true), "Explicit destructive permission was rejected."); }

@@ -14,6 +14,7 @@ public partial class App : Application
     private IFileTransferQueueService? _transfers;
     private IRecordingService? _recordings;
     private IAudioForwardingService? _audio;
+    private IScrcpyService? _scrcpy;
     private IGamepadService? _gamepads; private IVirtualDisplayService? _virtualDisplays; private ILanServerService? _lan;
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -27,6 +28,7 @@ public partial class App : Application
         IFileTransferQueueService transfers = new FileTransferQueueService(new AdbTransferExecutor(locator, settings));
         _transfers = transfers;
         IScrcpyService scrcpy = new ScrcpyService(locator, settings);
+        _scrcpy = scrcpy;
         IRecordingService recordings = new RecordingService(locator, settings);
         IAudioForwardingService audio = new AudioForwardingService(adb, locator, settings);
         IApplicationIconService applicationIcons = new ApplicationIconService(adb, new AppIconCache());
@@ -61,10 +63,19 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _transfers?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        _recordings?.Dispose();
-        _audio?.Dispose();
-        _gamepads?.Dispose(); _virtualDisplays?.Dispose(); _lan?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        TryCleanup(() => _transfers?.DisposeAsync().AsTask().GetAwaiter().GetResult());
+        TryCleanup(() => _recordings?.Dispose());
+        TryCleanup(() => _audio?.Dispose());
+        TryCleanup(() => _scrcpy?.StopAllAsync().GetAwaiter().GetResult());
+        TryCleanup(() => _gamepads?.Dispose());
+        TryCleanup(() => _virtualDisplays?.Dispose());
+        TryCleanup(() => _lan?.DisposeAsync().AsTask().GetAwaiter().GetResult());
         base.OnExit(e);
+    }
+
+    private static void TryCleanup(Action cleanup)
+    {
+        try { cleanup(); }
+        catch (Exception exception) { System.Diagnostics.Trace.TraceError($"PocketBridge shutdown cleanup failed: {exception}"); }
     }
 }

@@ -8,6 +8,7 @@ public interface IScrcpyService
 
     Task<DeviceSession> StartAsync(AndroidDevice device, ScrcpyLaunchOptions options);
     Task StopAsync(string serial, int displayId = 0);
+    Task StopAllAsync();
     bool IsRunning(string serial, int displayId = 0);
     IReadOnlyCollection<DeviceSession> GetActiveSessions();
 }

@@ -194,22 +194,11 @@ public partial class AndroidDisplayControl : UserControl
 
     private void UpdateVideoLayout()
     {
-        var width = _bitmap?.PixelWidth ?? Session?.VideoWidth ?? 0;
-        var height = _bitmap?.PixelHeight ?? Session?.VideoHeight ?? 0;
-        if (width > 0 && height > 0 && height > width)
-        {
-            VideoImage.HorizontalAlignment = HorizontalAlignment.Right;
-            VideoImage.VerticalAlignment = VerticalAlignment.Stretch;
-            VideoImage.Margin = new Thickness(8, 8, 12, 8);
-            VideoImage.Width = Math.Min(Math.Max(0, ActualWidth - 20), Math.Max(0, ActualHeight - 16) * width / height);
-        }
-        else
-        {
-            VideoImage.HorizontalAlignment = HorizontalAlignment.Stretch;
-            VideoImage.VerticalAlignment = VerticalAlignment.Stretch;
-            VideoImage.Margin = new Thickness(8);
-            VideoImage.ClearValue(WidthProperty);
-        }
+        VideoImage.HorizontalAlignment = HorizontalAlignment.Stretch;
+        VideoImage.VerticalAlignment = VerticalAlignment.Stretch;
+        VideoImage.Margin = new Thickness(8);
+        VideoImage.ClearValue(WidthProperty);
+        VideoImage.ClearValue(HeightProperty);
     }
 
     private bool TryMap(Point point, out int x, out int y)

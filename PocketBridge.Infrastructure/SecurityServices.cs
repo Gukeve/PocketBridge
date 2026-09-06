@@ -27,7 +27,10 @@ public sealed class AuditLogService : IAuditLogService
     public AuditLogService(int maximum = 500, string? path = null)
     {
         _maximum = Math.Max(1, maximum);
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PocketBridge", "audit-log.json");
+        var dataRoot = Environment.GetEnvironmentVariable("POCKETBRIDGE_DATA_ROOT");
+        _path = path ?? Path.Combine(string.IsNullOrWhiteSpace(dataRoot)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PocketBridge")
+            : Path.GetFullPath(dataRoot), "audit-log.json");
         Load();
     }
     public event EventHandler? Changed;
