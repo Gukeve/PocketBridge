@@ -24,10 +24,39 @@ PocketBridge 是一款独立的开源 Windows 应用，通过 ADB 和官方 scrc
 
 ## 构建
 
+安装当前的 .NET 8 SDK，然后从源码运行：
+
+```powershell
+git clone https://github.com/Gukeve/PocketBridge.git
+cd PocketBridge
+git switch next
+.\run.ps1
+```
+
+也可以直接运行：
+
+```powershell
+dotnet run --project .\PocketBridge.App\PocketBridge.App.csproj -c Release
+```
+
+`global.json` 要求 .NET 8 SDK `8.0.100` 或更高的兼容 .NET 8
+feature/patch 版本；应用目标框架仍为 `net8.0-windows`。
+
 ```powershell
 dotnet restore .\PocketBridge.sln --locked-mode
 dotnet build .\PocketBridge.sln -c Release --no-restore
 dotnet run --project .\PocketBridge.Tests\PocketBridge.Tests.csproj -c Release --no-build
+.\publish-local.ps1
 ```
+
+可运行程序位于 `publish\PocketBridge.App.exe`。这是依赖框架的 Windows
+x64 构建，需要 .NET 8 Desktop Runtime；`publish/` 不会提交到 Git。
+
+## 首次启动
+
+未连接手机时 PocketBridge 也应正常启动并显示空状态。如果缺少 native
+运行时，请使用应用内安装操作；PocketBridge 会下载并验证官方 scrcpy 和
+Android Platform-Tools。随后启用 USB 调试、连接设备，并在 Android
+设备上接受 ADB 授权。未授权和离线设备会显示不同的说明。
 
 第三方许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

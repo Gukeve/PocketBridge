@@ -65,7 +65,7 @@ jobs:
             if ($match) { throw "Forbidden bundled runtime file: $($match.FullName)" }
           }
           foreach ($required in @(
-            'PocketBridge.exe', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md',
+            'PocketBridge.App.exe', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md',
             'licenses\FFmpeg.AutoGen-MIT.txt', 'licenses\FFmpeg-LGPL-2.1.txt',
             'licenses\Android-Platform-Tools-37.0.0-NOTICE.txt',
             'licenses\dotnet-runtime-MIT.txt',
@@ -90,12 +90,12 @@ jobs:
             generatedAtUtc = [DateTime]::UtcNow.ToString('O')
           }
           $metadata | ConvertTo-Json | Set-Content -LiteralPath .\dist\PocketBridge\BUILD_INFO.json -Encoding UTF8
-          Compress-Archive -Path .\dist\PocketBridge\* -DestinationPath .\dist\PocketBridge-win-x64.zip
+          Compress-Archive -Path .\dist\PocketBridge\* -DestinationPath .\dist\PocketBridge-v1.0.0-rc1-win-x64.zip
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PocketBridge-win-x64
-          path: dist/PocketBridge-win-x64.zip
+          name: PocketBridge-v1.0.0-rc1-win-x64
+          path: dist/PocketBridge-v1.0.0-rc1-win-x64.zip
           if-no-files-found: error
           retention-days: 14

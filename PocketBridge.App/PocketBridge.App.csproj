@@ -11,7 +11,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <AssemblyName>PocketBridge</AssemblyName>
+    <AssemblyName>PocketBridge.App</AssemblyName>
     <RootNamespace>PocketBridge.App</RootNamespace>
   </PropertyGroup>
 
@@ -23,6 +23,7 @@
     <Content Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\README.ru.md" Link="README.ru.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\README.zh-CN.md" Link="README.zh-CN.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

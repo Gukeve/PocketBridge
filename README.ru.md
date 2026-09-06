@@ -74,15 +74,55 @@ runtime-бинарниками обязательно изучите
 **Wi-Fi → Включить и подключить**. Команда `adb -s SERIAL tcpip 5555` выполняется
 только для выбранного устройства.
 
+## Запуск из исходников
+
+Установите актуальный .NET 8 SDK, затем выполните:
+
+```powershell
+git clone https://github.com/Gukeve/PocketBridge.git
+cd PocketBridge
+git switch next
+.\run.ps1
+```
+
+Скрипт учитывает `global.json`, восстанавливает locked-зависимости, выполняет
+инкрементальную Release-сборку и запускает приложение. Прямой вариант:
+
+```powershell
+dotnet run --project .\PocketBridge.App\PocketBridge.App.csproj -c Release
+```
+
+## Сборка и локальная публикация
+
+```powershell
+dotnet restore .\PocketBridge.sln --locked-mode
+dotnet build .\PocketBridge.sln -c Release --no-restore
+.\publish-local.ps1
+```
+
+Готовая программа находится в `publish\PocketBridge.App.exe`. Это
+framework-dependent Windows x64 сборка, которой нужен .NET 8 Desktop Runtime.
+Каталог `publish/` локальный и игнорируется Git.
+
+### Первый запуск
+
+PocketBridge нормально запускается без телефона. Если официальные native-
+компоненты отсутствуют, используйте действие установки в приложении: scrcpy и
+Android Platform-Tools будут загружены и проверены автоматически. После этого
+включите USB-отладку, подключите телефон и подтвердите ADB-авторизацию на его
+экране. Для unauthorized и offline устройств показываются отдельные подсказки.
+
 ## Сборка и проверки
 
-Версия .NET SDK 8.0.423 закреплена в `global.json`.
+Проект требует .NET 8 SDK версии `8.0.100` или новее и принимает совместимые
+feature/patch версии .NET 8 через `global.json`. Release pipeline остаётся
+закреплён за проверенной версией .NET 8 SDK.
 
 ```powershell
 dotnet restore .\PocketBridge.sln --locked-mode
 dotnet build .\PocketBridge.sln -c Release --no-restore
 dotnet run --project .\PocketBridge.Tests\PocketBridge.Tests.csproj -c Release --no-build
-dotnet publish .\PocketBridge.App\PocketBridge.App.csproj -c Release --self-contained false
+dotnet publish .\PocketBridge.App\PocketBridge.App.csproj -c Release -r win-x64 --self-contained false
 ```
 
 GitHub Actions собирает и тестирует Windows x64, после чего сохраняет ZIP как
