@@ -207,30 +207,53 @@ public sealed class EmbeddedScrcpySession : IEmbeddedDisplaySession
     public Task SendScrollAsync(int x, int y, float horizontal, float vertical, uint buttons = 0, CancellationToken cancellationToken = default) =>
         WriteControlAsync(ScrcpyProtocolV41.Scroll(x, y, VideoWidth, VideoHeight, horizontal, vertical, buttons), cancellationToken);
 
-    public Task SendTextAsync(string text, CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.Text(text), cancellationToken);
+    public Task SendTextAsync(string text, CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.TextMessages(text), cancellationToken);
     public Task RequestClipboardAsync(CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.GetClipboard(), cancellationToken);
     public Task SendClipboardAsync(string text, long sequence, bool paste = false, CancellationToken cancellationToken = default) => WriteControlAsync(ScrcpyProtocolV41.SetClipboard(text, sequence, paste), cancellationToken);
 
     private async Task WriteControlAsync(byte[] message, CancellationToken cancellationToken)
+        => await WriteControlAsync(new[] { message }, cancellationToken).ConfigureAwait(false);
+
+    private async Task WriteControlAsync(IReadOnlyList<byte[]> messages, CancellationToken cancellationToken)
     {
-        if (!IsRunning || _transport is null) return;
-        await _controlGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try { await _transport.ControlStream.WriteAsync(message, cancellationToken).ConfigureAwait(false); }
-        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
+        if (messages.Count == 0) return;
+        var transport = Volatile.Read(ref _transport);
+        if (!IsRunning || transport is null) return;
+        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime?.Token ?? CancellationToken.None);
+        try
         {
+            await _controlGate.WaitAsync(linkedCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!IsRunning || !ReferenceEquals(transport, Volatile.Read(ref _transport))) return;
+                var stream = transport.ControlStream;
+                foreach (var message in messages) await stream.WriteAsync(message, linkedCancellation.Token).ConfigureAwait(false);
+            }
+            finally { _controlGate.Release(); }
+        }
+        catch (OperationCanceledException) when (linkedCancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or System.Net.Sockets.SocketException)
+        {
+            if (!ReferenceEquals(transport, Volatile.Read(ref _transport))) return;
             _failureReason = $"Control socket failed: {exception.Message}";
             IsRunning = false;
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
-        finally { _controlGate.Release(); }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         var lifetime = Interlocked.Exchange(ref _lifetime, null);
         lifetime?.Cancel();
-        var transport = Interlocked.Exchange(ref _transport, null);
-        if (transport is not null) await transport.DisposeAsync().ConfigureAwait(false);
+        IsRunning = false;
+        ScrcpyTransport? transport = null;
+        await _controlGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            transport = Interlocked.Exchange(ref _transport, null);
+            if (transport is not null) await transport.DisposeAsync().ConfigureAwait(false);
+        }
+        finally { _controlGate.Release(); }
         if (_videoTask is { } videoTask && Task.CurrentId != videoTask.Id)
         {
             try { await videoTask.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false); } catch (OperationCanceledException) { } catch (TimeoutException) { }

@@ -23,6 +23,8 @@ var tests = new (string Name, Action Run)[]
     ("Builds profile quality arguments", BuildsProfileQualityArguments),
     ("Pairs Wireless Debugging with explicit endpoint", PairsWirelessDebuggingEndpoint),
     ("Serializes clipboard protocol messages", SerializesClipboardMessages),
+    ("Chunks embedded text on valid UTF-8 boundaries", ChunksEmbeddedTextSafely),
+    ("Formats shortcut keys without invalid WPF gestures", FormatsShortcutKeysSafely),
     ("Prevents clipboard feedback loops", PreventsClipboardFeedbackLoops),
     ("Processes serial-scoped file transfer queue", ProcessesFileTransferQueue),
     ("Parses Android application metadata", ParsesAndroidApplicationMetadata),
@@ -306,6 +308,39 @@ static void SerializesClipboardMessages()
     Equal((byte)0, set[9]);
     Equal((uint)5, BinaryPrimitives.ReadUInt32BigEndian(set.AsSpan(10, 4)));
     Equal("hello", System.Text.Encoding.UTF8.GetString(set.AsSpan(14)));
+}
+
+static void ChunksEmbeddedTextSafely()
+{
+    var text = string.Concat(Enumerable.Repeat("Ж🙂abc", 100));
+    var messages = ScrcpyProtocolV41.TextMessages(text);
+    True(messages.Count > 1, "Long input text was not split into protocol messages.");
+    var decoded = new System.Text.StringBuilder();
+    foreach (var message in messages)
+    {
+        Equal((byte)1, message[0]);
+        var length = checked((int)BinaryPrimitives.ReadUInt32BigEndian(message.AsSpan(1, 4)));
+        True(length <= 300, "Inject-text payload exceeded scrcpy's limit.");
+        Equal(length + 5, message.Length);
+        decoded.Append(System.Text.Encoding.UTF8.GetString(message.AsSpan(5, length)));
+    }
+    Equal(text, decoded.ToString());
+    Equal(0, ScrcpyProtocolV41.TextMessages(string.Empty).Count);
+
+    var clipboard = ScrcpyProtocolV41.SetClipboard(string.Concat(Enumerable.Repeat("Ж", 140_000)), 7, true);
+    var clipboardLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(clipboard.AsSpan(10, 4)));
+    True(clipboardLength <= 262_130, "Clipboard payload exceeded scrcpy's limit.");
+    var roundTrip = System.Text.Encoding.UTF8.GetString(clipboard.AsSpan(14, clipboardLength));
+    True(roundTrip.All(character => character == 'Ж'), "Clipboard truncation split a UTF-8 character.");
+}
+
+static void FormatsShortcutKeysSafely()
+{
+    Equal<string?>(null, ShortcutGestureFormatter.Format("LeftCtrl", true, false, false, false));
+    Equal<string?>(null, ShortcutGestureFormatter.Format("None", false, false, false, false));
+    Equal("F", ShortcutGestureFormatter.Format("F", false, false, false, false));
+    Equal("Ctrl+V", ShortcutGestureFormatter.Format("V", true, false, false, false));
+    Equal("Ctrl+Shift+V", ShortcutGestureFormatter.Format("V", true, true, false, false));
 }
 
 static void PreventsClipboardFeedbackLoops()

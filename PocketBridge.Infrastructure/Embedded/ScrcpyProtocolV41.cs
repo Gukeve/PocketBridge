@@ -62,8 +62,32 @@ internal static class ScrcpyProtocolV41
 
     public static byte[] Text(string text)
     {
-        var utf8 = Encoding.UTF8.GetBytes(text);
-        if (utf8.Length > 300) Array.Resize(ref utf8, 300);
+        var utf8 = Utf8Prefix(text, 300);
+        return TextPayload(utf8);
+    }
+
+    public static IReadOnlyList<byte[]> TextMessages(string text)
+    {
+        if (text.Length == 0) return Array.Empty<byte[]>();
+        var messages = new List<byte[]>();
+        var chunk = new List<byte>(300);
+        Span<byte> encoded = stackalloc byte[4];
+        foreach (var rune in text.EnumerateRunes())
+        {
+            var length = rune.EncodeToUtf8(encoded);
+            if (chunk.Count > 0 && chunk.Count + length > 300)
+            {
+                messages.Add(TextPayload(chunk.ToArray()));
+                chunk.Clear();
+            }
+            for (var index = 0; index < length; index++) chunk.Add(encoded[index]);
+        }
+        if (chunk.Count > 0) messages.Add(TextPayload(chunk.ToArray()));
+        return messages;
+    }
+
+    private static byte[] TextPayload(byte[] utf8)
+    {
         var data = new byte[5 + utf8.Length];
         data[0] = 1;
         BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(1), (uint)utf8.Length);
@@ -75,8 +99,7 @@ internal static class ScrcpyProtocolV41
 
     public static byte[] SetClipboard(string text, long sequence, bool paste)
     {
-        var utf8 = Encoding.UTF8.GetBytes(text);
-        if (utf8.Length > 262_130) Array.Resize(ref utf8, 262_130);
+        var utf8 = Utf8Prefix(text, 262_130);
         var data = new byte[14 + utf8.Length];
         data[0] = 9;
         BinaryPrimitives.WriteUInt64BigEndian(data.AsSpan(1), unchecked((ulong)sequence));
@@ -84,6 +107,14 @@ internal static class ScrcpyProtocolV41
         BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(10), (uint)utf8.Length);
         utf8.CopyTo(data, 14);
         return data;
+    }
+
+    private static byte[] Utf8Prefix(string text, int maxBytes)
+    {
+        var buffer = new byte[Math.Min(Encoding.UTF8.GetByteCount(text), maxBytes)];
+        Encoding.UTF8.GetEncoder().Convert(text.AsSpan(), buffer.AsSpan(), true, out _, out var bytesUsed, out _);
+        if (bytesUsed != buffer.Length) Array.Resize(ref buffer, bytesUsed);
+        return buffer;
     }
 
     private static ushort ToFixedPoint16(float value) => value >= 1 ? ushort.MaxValue : value <= 0 ? (ushort)0 : (ushort)(value * 65536f);

@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using PocketBridge.Core.Services;
+using PocketBridge.Core.Models;
 using PocketBridge.App.ViewModels;
 
 namespace PocketBridge.App;
@@ -59,7 +60,11 @@ public partial class MainWindow : Window
         else
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            var gesture = new KeyGesture(key, Keyboard.Modifiers).GetDisplayStringForCulture(System.Globalization.CultureInfo.InvariantCulture);
+            var modifiers = Keyboard.Modifiers;
+            var gesture = ShortcutGestureFormatter.Format(key.ToString(),
+                modifiers.HasFlag(ModifierKeys.Control), modifiers.HasFlag(ModifierKeys.Shift),
+                modifiers.HasFlag(ModifierKeys.Alt), modifiers.HasFlag(ModifierKeys.Windows));
+            if (gesture is null) return;
             var action = _viewModel.MatchShortcut(gesture);
             if (action == PocketBridge.Core.Models.ShortcutAction.ToggleFullscreen) ToggleFullscreen();
             else if (action is not null) _viewModel.ExecuteShortcut(action.Value);

@@ -39,6 +39,7 @@ public partial class AndroidDisplayControl : UserControl
     private long _lastDecodedPts;
     private long _lastPacketPts;
     private long _lastDecodedSequence;
+    private static long _clipboardSequence = DateTime.UtcNow.Ticks;
 
     public AndroidDisplayControl()
     {
@@ -270,6 +271,12 @@ public partial class AndroidDisplayControl : UserControl
     {
         if (HandleEditorKey(e)) { e.Handled = true; return; }
         if (Session is null) return;
+        if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            await PasteClipboardAsync(Session);
+            e.Handled = true;
+            return;
+        }
         var mapped = MappingProfile?.Bindings.FirstOrDefault(item => item.SourceKind == InputSourceKind.KeyboardKey && string.Equals(item.Input, e.Key.ToString(), StringComparison.OrdinalIgnoreCase));
         if (mapped is not null) { await ExecuteMappedAsync(mapped.Action, true); e.Handled = true; return; }
         if (!TryAndroidKey(e.Key, out var keyCode)) return;
@@ -290,8 +297,36 @@ public partial class AndroidDisplayControl : UserControl
     private async void OnTextInput(object sender, TextCompositionEventArgs e)
     {
         if (Session is null || string.IsNullOrEmpty(e.Text) || char.IsControl(e.Text[0])) return;
-        await Session.SendTextAsync(e.Text);
+        await SendTextAsync(Session, e.Text);
         e.Handled = true;
+    }
+
+    private static async Task PasteClipboardAsync(IEmbeddedDisplaySession session)
+    {
+        try
+        {
+            var text = Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+            await session.SendClipboardAsync(text, Interlocked.Increment(ref _clipboardSequence), paste: true);
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or ObjectDisposedException)
+        {
+            Trace.TraceWarning($"Embedded clipboard paste failed: {exception.Message}");
+        }
+    }
+
+    private static async Task SendTextAsync(IEmbeddedDisplaySession session, string text)
+    {
+        try
+        {
+            if (text.EnumerateRunes().Any(rune => !rune.IsAscii))
+                await session.SendClipboardAsync(text, Interlocked.Increment(ref _clipboardSequence), paste: true);
+            else
+                await session.SendTextAsync(text);
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            Trace.TraceWarning($"Embedded text input failed: {exception.Message}");
+        }
     }
 
     private static int MetaState() =>
