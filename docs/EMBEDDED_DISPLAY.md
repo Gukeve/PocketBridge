@@ -44,7 +44,7 @@ The WPF surface maps letterboxed pointer coordinates back to current Android vid
 
 Session and rotation metadata update the coordinate space without restarting the host window.
 
-Portrait frames use almost all available height and align to the right with a small margin. Landscape frames remain centered with uniform scaling. Input mapping reads the actual arranged image bounds, so DPI, margins, and orientation changes use the same visible rectangle as rendering.
+Portrait and landscape frames are centered with uniform scaling inside the available video area. The controls panel retains its own column, and each Multi View tile centers its own video independently. Input mapping and Edit Controls read the actual visible video rectangle, so DPI, resize, fullscreen, margins, letterboxing, and orientation changes use the same coordinate space as rendering.
 
 ## Multi-device lifecycle
 
@@ -56,4 +56,4 @@ The separate official `scrcpy.exe` client remains available only through **Open 
 
 ## Current scope
 
-The first embedded milestone supports H.264 video and control input. Audio and clipboard synchronization are not implemented. FFmpeg software decoding is used; a hardware decoder may be added behind the same session boundary later.
+The embedded client supports H.264 video, control input, clipboard synchronization, normalized input profiles, and Edit Controls overlays. Audio forwarding and recording intentionally remain separate official-scrcpy processes rather than adding another embedded media pipeline. FFmpeg software decoding is used. Hardware decoding and other codec pipelines are outside the current implementation.

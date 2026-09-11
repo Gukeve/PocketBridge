@@ -7,7 +7,7 @@ do not have the right to license.
 
 ## Development setup
 
-1. Use Windows 10/11 x64 and the .NET SDK pinned in `global.json`.
+1. Use Windows 10/11 x64 and a compatible .NET 8 SDK selected by `global.json`.
 2. Run `dotnet restore .\PocketBridge.sln --locked-mode`.
 3. Build and run the executable checks shown below.
 4. Run `.\prepare-runtime.ps1` only when physical-device testing is required.

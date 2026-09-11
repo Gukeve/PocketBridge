@@ -111,35 +111,11 @@ P2 code status is COMPLETE. P2 hardware acceptance remains PARTIAL because no ph
 
 P3 code status is **COMPLETE** for the scoped P3 implementation. P3 security is **CODE COMPLETE / HARDWARE-NETWORK NOT VERIFIED**. P3 hardware is **NOT VERIFIED** for this completion pass; see `docs/P3_HARDWARE_ACCEPTANCE.md` and `docs/P3_SECURITY_REVIEW.md`.
 
-## First implementation slice
+## Release-candidate checkpoint
 
-Implemented on `next` in this stage:
+P0-P3 scoped code is implemented on `next`. The current pass is a release-candidate and reliability checkpoint rather than a new feature phase. Remaining acceptance is documented in the hardware matrices: physical gamepad/input, multi-device isolation, secondary/virtual displays, recording finalization, and private-LAN adversarial behavior must not be reported as verified until those tests actually run.
 
-- P0.1 persistent, serial-keyed profiles with aliases and atomic JSON persistence;
-- P0.2 adaptive 1/2/4 Multi View over independent embedded sessions, with double-click focus;
-- P0.3 validated resolution, FPS, bitrate, H.264 capability disclosure, and external-session preferences;
-- the first P1.4 slice: remembered last successful endpoint and Android 11+ pairing-code flow without persisting the code.
-
-Remaining P0/P1 work continues in later logical commits. Features requiring device capabilities are not considered hardware-accepted until the manual matrix below is executed.
-
-## Current implementation status
-
-The following source-level P1 work is complete on `next`:
-
-- bidirectional clipboard sync with Off/Manual/Automatic modes and feedback-loop prevention;
-- background drag-and-drop transfer queue with progress, cancel, retry and clear-completed;
-- Application Manager with user/system search, package metadata, launch, stop, uninstall, update, details and confirmed data clearing;
-- serial-scoped recording through the official scrcpy recorder in no-playback mode, with REC timer and configurable MP4/MKV destination;
-- expanded screenshots with configurable folder/name format, Windows-safe filenames, `Ctrl+Shift+S`, open/copy/Explorer actions;
-- embedded fullscreen with F11/Ctrl+Shift+F, Esc restore and a fading overlay;
-- Device Information including battery, storage and uptime, with serial/IP hidden by default when copied;
-- Advanced ADB Console with a fixed visible target, automatic `adb -s SERIAL` scoping, history, timestamps, streamed output and cancellation.
-
-The recording implementation deliberately uses a separate official scrcpy process: the embedded renderer currently exposes decoded H.264 frames and has no container muxer. This avoids adding a second codec stack or an unbounded re-encode queue, but requires hardware validation of graceful file finalization.
-
-P1 code complete. P1 hardware acceptance PARTIAL; the remaining manual cases stay listed in `docs/P1_HARDWARE_ACCEPTANCE.md`.
-
-P2 code is complete as described above. P3 remains gamepad/HID, virtual displays/OTG, LAN/web access, and automation with a permission model, and has not been started.
+Recording deliberately uses a separate serial-scoped official scrcpy process because the embedded renderer exposes decoded H.264 frames and has no container muxer. This avoids a second codec stack and an unbounded re-encode queue.
 
 ## Verification matrix
 
