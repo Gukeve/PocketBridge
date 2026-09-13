@@ -92,13 +92,13 @@ public partial class MainWindow : Window
         RootGrid.RowDefinitions[0].Height = _fullscreen ? new GridLength(0) : new GridLength(100);
         RootGrid.RowDefinitions[2].Height = _fullscreen ? new GridLength(0) : new GridLength(54);
         MainContentGrid.Margin = _fullscreen ? new Thickness(0) : new Thickness(24, 8, 24, 12);
-        MainContentGrid.ColumnDefinitions[0].Width = _fullscreen ? new GridLength(0) : new GridLength(270);
+        MainContentGrid.ColumnDefinitions[0].Width = _fullscreen ? new GridLength(0) : new GridLength(300);
         MainContentGrid.ColumnDefinitions[1].Width = _fullscreen ? new GridLength(0) : new GridLength(12);
         SingleDeviceGrid.RowDefinitions[0].Height = _fullscreen ? new GridLength(0) : GridLength.Auto;
         SingleDeviceGrid.RowDefinitions[1].Height = _fullscreen ? new GridLength(0) : new GridLength(16);
         SingleDeviceGrid.RowDefinitions[2].Height = _fullscreen ? new GridLength(0) : GridLength.Auto;
         SingleDeviceGrid.RowDefinitions[3].Height = _fullscreen ? new GridLength(0) : new GridLength(16);
-        ScreenGrid.ColumnDefinitions[0].Width = _fullscreen ? new GridLength(0) : new GridLength(240);
+        ScreenGrid.ColumnDefinitions[0].Width = _fullscreen ? new GridLength(0) : new GridLength(270);
         ScreenGrid.ColumnDefinitions[1].Width = _fullscreen ? new GridLength(0) : new GridLength(10);
         MainPanel.Padding = PreviewPanel.Padding = _fullscreen ? new Thickness(0) : new Thickness(16);
         PreviewPanel.CornerRadius = _fullscreen ? new CornerRadius(0) : new CornerRadius(14);

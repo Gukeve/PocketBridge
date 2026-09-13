@@ -16,12 +16,13 @@
             </Grid.RowDefinitions>
 
             <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="250" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="{loc:Loc Files}" FontSize="22" FontWeight="SemiBold" />
                     <TextBlock x:Name="DeviceText" Margin="0,4,0,0" Foreground="{StaticResource SecondaryTextBrush}" />
                 </StackPanel>
-                <Button Grid.Column="1" Style="{StaticResource BaseButton}" Content="{loc:Loc Refresh}" Click="Refresh_Click" />
+                <TextBox Grid.Column="1" x:Name="FilterBox" Style="{StaticResource TextField}" Margin="12,0,8,0" ToolTip="{loc:Loc Files}" AutomationProperties.Name="{loc:Loc Files}" TextChanged="Filter_TextChanged" />
+                <Button Grid.Column="2" Style="{StaticResource BaseButton}" Content="{loc:Loc Refresh}" Click="Refresh_Click" />
             </Grid>
 
             <WrapPanel Grid.Row="1" Margin="0,16,0,10">

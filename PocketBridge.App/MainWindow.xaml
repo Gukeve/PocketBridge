@@ -32,7 +32,7 @@
         </Border>
 
         <Grid x:Name="MainContentGrid" Grid.Row="1" Margin="24,8,24,12">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="270" MinWidth="240" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="300" MinWidth="270" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
             <Border x:Name="DeviceListPanel" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="14">
                 <Grid>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
@@ -103,7 +103,7 @@
                             <Button Grid.Column="4" Style="{StaticResource BaseButton}" Command="{Binding RestartCommand}" Content="{loc:Loc RestartSession}" />
                         </Grid>
                         <Grid x:Name="ScreenGrid" Grid.Row="4">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="240" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="270" MinWidth="250" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                         <Border x:Name="ControlPanel" Grid.Column="0" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="16">
                             <StackPanel>
                                 <TextBlock Text="{loc:Loc DeviceControls}" FontSize="15" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc SerialSafety}" FontSize="11" Margin="0,3,0,7" Foreground="{StaticResource TextSecondaryBrush}" />

@@ -2,18 +2,20 @@
     <Border Margin="20" Padding="24" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="16">
         <StackPanel>
             <TextBlock Text="{loc:Loc AddDevice}" FontSize="22" FontWeight="SemiBold" /><TextBlock x:Name="DeviceText" Margin="0,5,0,0" Foreground="{StaticResource SecondaryTextBrush}" />
-            <TextBlock Text="{loc:Loc WifiUsbHelp}" Margin="0,16,0,18" Foreground="{StaticResource SecondaryTextBrush}" />
+            <TextBlock Text="{loc:Loc WifiUsbHelp}" Margin="0,16,0,18" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
+            <TextBlock Text="{loc:Loc EnableWifiFromUsb}" FontSize="16" FontWeight="SemiBold" />
             <Button x:Name="EnableButton" Style="{StaticResource PrimaryButton}" Content="{loc:Loc EnableAndConnect}" Click="Enable_Click" />
             <Separator Margin="0,20" Background="{StaticResource BorderBrush}" />
-            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{loc:Loc IpAddress}" Margin="0,0,0,6" /><TextBox x:Name="IpBox" Style="{StaticResource TextField}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="{loc:Loc Port}" Margin="0,0,0,6" /><TextBox x:Name="PortBox" Text="5555" Style="{StaticResource TextField}" /></StackPanel></Grid>
+            <TextBlock Text="{loc:Loc ConnectByIp}" FontSize="16" FontWeight="SemiBold" />
+            <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{loc:Loc IpAddress}" Margin="0,0,0,6" /><TextBox x:Name="IpBox" Style="{StaticResource TextField}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="{loc:Loc Port}" Margin="0,0,0,6" /><TextBox x:Name="PortBox" Text="5555" Style="{StaticResource TextField}" /></StackPanel></Grid>
             <Button x:Name="ConnectButton" Style="{StaticResource BaseButton}" Content="{loc:Loc ConnectByIp}" Margin="0,14,0,0" Click="Connect_Click" />
             <Separator Margin="0,20" Background="{StaticResource BorderBrush}" />
             <TextBlock Text="{loc:Loc WirelessPairing}" FontSize="17" FontWeight="SemiBold" />
             <TextBlock Text="{loc:Loc WirelessPairingHelp}" Margin="0,5,0,12" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="90" /><ColumnDefinition Width="10" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
-                <TextBox x:Name="PairIpBox" Grid.Column="0" Style="{StaticResource TextField}" ToolTip="{loc:Loc IpAddress}" />
-                <TextBox x:Name="PairPortBox" Grid.Column="2" Style="{StaticResource TextField}" ToolTip="{loc:Loc PairingPort}" />
-                <TextBox x:Name="PairCodeBox" Grid.Column="4" Style="{StaticResource TextField}" MaxLength="6" ToolTip="{loc:Loc PairingCode}" />
+                <StackPanel Grid.Column="0"><TextBlock Text="{loc:Loc IpAddress}" Margin="0,0,0,6"/><TextBox x:Name="PairIpBox" Style="{StaticResource TextField}" /></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="{loc:Loc PairingPort}" Margin="0,0,0,6"/><TextBox x:Name="PairPortBox" Style="{StaticResource TextField}" /></StackPanel>
+                <StackPanel Grid.Column="4"><TextBlock Text="{loc:Loc PairingCode}" Margin="0,0,0,6"/><TextBox x:Name="PairCodeBox" Style="{StaticResource TextField}" MaxLength="6" /></StackPanel>
             </Grid>
             <Button x:Name="PairButton" Style="{StaticResource BaseButton}" Content="{loc:Loc PairDevice}" Margin="0,12,0,0" Click="Pair_Click" />
             <TextBlock x:Name="StatusText" Margin="0,16,0,0" Foreground="{StaticResource SecondaryTextBrush}" />

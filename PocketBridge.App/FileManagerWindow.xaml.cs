@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using PocketBridge.App.Localization;
@@ -17,6 +18,7 @@ public partial class FileManagerWindow : Window
     private readonly IAdbFileService _files;
     private readonly IConfirmationService _confirmation;
     private readonly ObservableCollection<FileRow> _entries = new();
+    private IReadOnlyList<FileRow> _allEntries = Array.Empty<FileRow>();
     private string _currentPath = StorageRoot;
     private bool _busy;
 
@@ -38,14 +40,27 @@ public partial class FileManagerWindow : Window
         await RunAsync(async () =>
         {
             var entries = await _files.ListAsync(_device.Serial, _currentPath);
-            _entries.Clear();
-            foreach (var entry in entries) _entries.Add(new FileRow(entry));
+            _allEntries = entries.Select(entry => new FileRow(entry)).ToArray();
+            ApplyFilter();
             PathText.Text = _currentPath;
             return LocalizationService.Current.Format("EntriesFound", entries.Count);
         });
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
+
+    private void Filter_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (IsInitialized) ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        var query = FilterBox?.Text.Trim() ?? string.Empty;
+        _entries.Clear();
+        foreach (var entry in _allEntries.Where(item => query.Length == 0 || item.Entry.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
+            _entries.Add(entry);
+    }
 
     private async void Up_Click(object sender, RoutedEventArgs e)
     {

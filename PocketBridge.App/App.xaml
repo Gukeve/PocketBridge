@@ -54,6 +54,85 @@
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="10,7" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{StaticResource CardHoverBrush}" /><Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource WindowBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="TabControl">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" /><Setter Property="Background" Value="{StaticResource AccentBrush}" /></Trigger>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{StaticResource CardHoverBrush}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="RowBackground" Value="{StaticResource CardBrush}" />
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource PanelBrush}" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="VerticalGridLinesBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="RowHeaderWidth" Value="0" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="White" /><Setter Property="Background" Value="{StaticResource AccentBrush}" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{StaticResource CardHoverBrush}" /></Trigger>
+                <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#294064" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="Background" Value="{StaticResource WindowBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="SelectionTextBrush" Value="White" />
         </Style>
 
         <Style x:Key="BaseButton" TargetType="Button">

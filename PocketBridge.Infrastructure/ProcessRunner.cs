@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using PocketBridge.Core.Models;
 
 namespace PocketBridge.Infrastructure;
@@ -18,7 +19,9 @@ internal static class ProcessRunner
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
 
         foreach (var argument in arguments)
